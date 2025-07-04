@@ -1,5 +1,4 @@
 ﻿using CijeneScraper.Crawler;
-using CijeneScraper.Crawler.Chains;
 using CijeneScraper.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,8 +13,14 @@ namespace CijeneScraper.Controllers
         private readonly Dictionary<string, ICrawler> _crawlers;
         private const string outputFolder = "ScrapedData";
 
-        public ScraperController(ScrapingQueue queue, 
-            ILogger<ScraperController> logger, 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ScraperController"/> class.
+        /// </summary>
+        /// <param name="queue">The scraping queue for managing scraping tasks.</param>
+        /// <param name="logger">The logger instance for logging information and errors.</param>
+        /// <param name="crawlers">A collection of available crawlers, mapped by chain name.</param>
+        public ScraperController(ScrapingQueue queue,
+            ILogger<ScraperController> logger,
             IEnumerable<ICrawler> crawlers)
         {
             _queue = queue;
@@ -25,35 +30,37 @@ namespace CijeneScraper.Controllers
                 StringComparer.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Starts a scraping job for the specified chain and optional date.
+        /// </summary>
+        /// <param name="chain">The name of the chain to scrape.</param>
+        /// <param name="date">The date for which to scrape data. If null, the current date is used.</param>
+        /// <returns>
+        /// Returns 202 Accepted if the scraping job is added to the queue,
+        /// 400 Bad Request if the chain is unknown.
+        /// </returns>
         [HttpPost("start/{chain}")]
         public IActionResult StartScraping(string chain, DateTime? date = null)
         {
-            _logger.LogInformation("Zahtjev za scrapanje primljen.");
+            _logger.LogInformation("Scraping request received.");
 
             if (!_crawlers.TryGetValue(chain, out var crawler))
             {
-                _logger.LogError("Nepoznat lanac: {chain}", chain);
-                return BadRequest($"Nepoznat lanac: {chain}");
+                _logger.LogError("Unknown chain: {chain}", chain);
+                return BadRequest($"Unknown chain: {chain}");
             }
 
-            if(date == null)
+            if (date == null)
             {
                 date = DateTime.Now;
             }
 
-            _queue.Enqueue(token =>
-                crawler.CrawlAsync(outputFolder, date, token));
+            _queue.Enqueue(async token =>
+            {
+                await crawler.CrawlAsync(outputFolder, date, token);
+            });
 
-            //_queue.Enqueue(async token =>
-            //{
-            //    // Ovamo stavi stvarni scraper
-            //    await Task.Delay(3000, token); // simulacija scrapanja
-            //    Console.WriteLine($"Scrapanje obavljeno u {DateTime.Now}");
-            //});
-
-            //_queue.Enqueue(token => crawler.CrawlAsync(configuredOutput, DateTime.Now, token));
-
-            return Accepted("Scrapanje dodano u red.");
+            return Accepted("Scraping job added to the queue.");
         }
     }
 }
