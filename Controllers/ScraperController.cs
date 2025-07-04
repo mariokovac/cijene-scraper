@@ -73,7 +73,7 @@ namespace CijeneScraper.Controllers
 
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                DateTime isoDate = date.Value.Date.ToUniversalTime();
+                DateOnly isoDate = DateOnly.FromDateTime(date.Value);
 
                 using var transaction = await dbContext.Database.BeginTransactionAsync(token);
                 try

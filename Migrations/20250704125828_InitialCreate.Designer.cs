@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CijeneScraper.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250704090933_InitialCreate")]
+    [Migration("20250704125828_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -67,6 +67,9 @@ namespace CijeneScraper.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -101,8 +104,11 @@ namespace CijeneScraper.Migrations
                     b.Property<long>("ChainProductId")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime>("Date")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
 
                     b.Property<decimal?>("MPC")
                         .HasColumnType("numeric");
@@ -118,9 +124,16 @@ namespace CijeneScraper.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChainProductId");
+                    b.HasIndex(new[] { "ChainProductId" }, "IX_Prices_ChainProductId");
 
-                    b.HasIndex("StoreId");
+                    b.HasIndex(new[] { "Date" }, "IX_Prices_Date");
+
+                    b.HasIndex(new[] { "Date", "ChainProductId", "StoreId" }, "IX_Prices_Date_ChainProduct_Store");
+
+                    b.HasIndex(new[] { "StoreId" }, "IX_Prices_StoreId");
+
+                    b.HasIndex(new[] { "ChainProductId", "StoreId", "Date" }, "UX_Prices_Product_Store_Date")
+                        .IsUnique();
 
                     b.ToTable("Prices");
                 });
@@ -145,6 +158,9 @@ namespace CijeneScraper.Migrations
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PostalCode")
                         .HasColumnType("text");

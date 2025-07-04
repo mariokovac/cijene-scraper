@@ -2,5 +2,12 @@
 
 POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum
 Accept: application/json
+###
 
+GET {{cijene_scraper_HostAddress}}/api/prices?dates=2025-07-04
+Accept: application/json
+###
+
+GET {{cijene_scraper_HostAddress}}/api/prices/CheapestLocation?barcode=8445290308238&date=2025-07-04
+Accept: application/json
 ###
