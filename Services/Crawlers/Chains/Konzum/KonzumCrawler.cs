@@ -35,7 +35,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             : base(http, cache, logger) { }
 
         public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
-            DateTime? date = null, 
+            DateOnly date, 
             CancellationToken cancellationToken = default)
         {
             return await _crawlAndProcess(date, cancellationToken, (store, products) =>
@@ -46,7 +46,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 
         public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> CrawlAsync(
             string outputFolder,
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default)
         {
             cacheFolder = Path.Combine(outputFolder);
@@ -67,17 +67,16 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
         #region Private Methods
 
         private async Task<Dictionary<StoreInfo, List<PriceInfo>>> _crawlAndProcess(
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default,
             Action<StoreInfoDto, List<ProductInfoDto>>? onStoreProcessed = null)
         {
-            var crawlDate = date ?? DateTime.UtcNow.Date;
             var result = new Dictionary<StoreInfo, List<PriceInfo>>();
 
-            var csvUrls = await GetIndexUrls(crawlDate);
+            var csvUrls = await GetIndexUrls(date);
             if (!csvUrls.Any())
             {
-                _logger.LogWarning($"No price list found for {crawlDate:yyyy-MM-dd}");
+                _logger.LogWarning($"No price list found for {date:yyyy-MM-dd}");
                 return new Dictionary<StoreInfo, List<PriceInfo>>();
             }
 
@@ -122,7 +121,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 }
             }
 
-            _logger.LogInformation($"Crawled {result.Count} stores for {crawlDate:yyyy-MM-dd}");
+            _logger.LogInformation($"Crawled {result.Count} stores for {date:yyyy-MM-dd}");
             return result;
         }
 
@@ -155,7 +154,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             return results.ToList();
         }
 
-        private async Task<List<string>> GetIndexUrls(DateTime date)
+        private async Task<List<string>> GetIndexUrls(DateOnly date)
         {
             var urls = new List<string>();
             for (int page = 1; page <= 10; page++)

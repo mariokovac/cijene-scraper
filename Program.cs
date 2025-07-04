@@ -4,6 +4,7 @@ using CijeneScraper.Data.Repository;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Caching;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
+using CijeneScraper.Services.DataProcessor;
 using Microsoft.EntityFrameworkCore;
 
 namespace CijeneScraper
@@ -34,7 +35,6 @@ namespace CijeneScraper
             builder.Services.AddControllers();
             builder.Services.AddSingleton<ScrapingQueue>();
             builder.Services.AddHostedService<ScrapingWorker>();
-
             builder.Services.AddSingleton<HttpClient>();
             builder.Services.AddSingleton<ICacheProvider, ParquetCacheProvider>();
             builder.Services.AddTransient<ICrawler, KonzumCrawler>();
@@ -43,9 +43,10 @@ namespace CijeneScraper
             // builder.Services.AddTransient<ICrawler, IntersparCrawler>();
             // builder.Services.AddTransient<ICrawler, LidlCrawler>();
 
+            builder.Services.AddScoped<IScrapingDataProcessor, ScrapingDataProcessor>();
+
             // Register OpenAPI/Swagger services
             builder.Services.AddOpenApiDocument();
-
 
             var app = builder.Build();
 

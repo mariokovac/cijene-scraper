@@ -16,7 +16,7 @@ namespace CijeneScraper.Crawler
         /// A dictionary mapping <see cref="StoreInfo"/> to a list of <see cref="PriceInfo"/> objects.
         /// </returns>
         Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace CijeneScraper.Crawler
         /// </returns>
         Task<Dictionary<StoreInfo, List<PriceInfo>>> CrawlAsync(
             string outputFolder,
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default);
 
         /// <summary>

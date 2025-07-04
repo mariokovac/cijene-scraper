@@ -1,6 +1,6 @@
 @cijene_scraper_HostAddress = http://localhost:5276
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum?date=2025-07-04
 Accept: application/json
 ###
 

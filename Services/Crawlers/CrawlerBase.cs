@@ -48,13 +48,13 @@ namespace CijeneScraper.Crawler
 
         /// <inheritdoc/>
         public abstract Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default);
 
         /// <inheritdoc/>
         public abstract Task<Dictionary<StoreInfo, List<PriceInfo>>> CrawlAsync(
             string outputFolder,
-            DateTime? date = null,
+            DateOnly date,
             CancellationToken cancellationToken = default);
 
         /// <summary>
