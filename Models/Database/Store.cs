@@ -1,0 +1,28 @@
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace CijeneScraper.Models.Database
+{
+    public class Store
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public long Id { get; set; }
+
+        public int ChainId { get; set; }
+
+        [Required]
+        public string Code { get; set; } = null!;
+
+        public string? Address { get; set; } = null!;
+
+        public string? City { get; set; } = null!;
+
+        public string? PostalCode { get; set; } = null!;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [ForeignKey("ChainId")]
+        public virtual Chain Chain { get; set; } = null!;
+    }
+}

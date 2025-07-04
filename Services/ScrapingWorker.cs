@@ -1,4 +1,6 @@
 ﻿
+using CijeneScraper.Data;
+
 namespace CijeneScraper.Services
 {
     /// <summary>
@@ -14,7 +16,10 @@ namespace CijeneScraper.Services
         /// </summary>
         /// <param name="queue">The scraping task queue.</param>
         /// <param name="logger">The logger instance.</param>
-        public ScrapingWorker(ScrapingQueue queue, ILogger<ScrapingWorker> logger)
+        public ScrapingWorker(
+            ScrapingQueue queue, 
+            ILogger<ScrapingWorker> logger
+            )
         {
             _queue = queue;
             _logger = logger;

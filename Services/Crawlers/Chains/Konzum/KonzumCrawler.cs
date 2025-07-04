@@ -16,6 +16,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using ZstdSharp.Unsafe;
 
 namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 {
@@ -30,19 +31,22 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 
         public override string Chain { get => CHAIN; }
 
-        public KonzumCrawler(HttpClient http, ICacheProvider cache) : base(http, cache) { }
+        public KonzumCrawler(HttpClient http, ICacheProvider cache, ILogger<KonzumCrawler> logger) 
+            : base(http, cache, logger) { }
 
-        public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(DateTime? date = null, CancellationToken cancellationToken = default)
+        public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
+            DateTime? date = null, 
+            CancellationToken cancellationToken = default)
         {
             return await _crawlAndProcess(date, cancellationToken, (store, products) =>
             {
-                Console.WriteLine($"Store: {store.StoreId}, Products: {products.Count}");
+                _logger.LogInformation($"Processed store: {store.StoreId}, Products: {products.Count}");
             });
         }
 
         public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> CrawlAsync(
-            string outputFolder, 
-            DateTime? date = null, 
+            string outputFolder,
+            DateTime? date = null,
             CancellationToken cancellationToken = default)
         {
             cacheFolder = Path.Combine(outputFolder);
@@ -54,11 +58,13 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 
                 await _cache.SaveAsync(storeFolder, fileName, products, cancellationToken);
 
-                Console.WriteLine($"Saved {products.Count} products for store {store.StoreId}.");
+                _logger.LogInformation($"Saved {products.Count} products for store {store.StoreId} to {storeFolder}/{fileName}{_cache.Extension}");
             });
 
             return data;
         }
+
+        #region Private Methods
 
         private async Task<Dictionary<StoreInfo, List<PriceInfo>>> _crawlAndProcess(
             DateTime? date = null,
@@ -71,9 +77,15 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             var csvUrls = await GetIndexUrls(crawlDate);
             if (!csvUrls.Any())
             {
-                Console.WriteLine($"No price list found for {crawlDate:yyyy-MM-dd}");
+                _logger.LogWarning($"No price list found for {crawlDate:yyyy-MM-dd}");
                 return new Dictionary<StoreInfo, List<PriceInfo>>();
             }
+
+#if DEBUG
+            // In debug mode, we limit the number of URLs to process for testing purposes
+            csvUrls = csvUrls.Take(2).ToList();
+            _logger.LogInformation($"Processing {csvUrls.Count} URLs in debug mode.");
+#endif
 
             foreach (var url in csvUrls)
             {
@@ -90,7 +102,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                     if (_cache.Exists(filePath))
                     {
                         // If file already exists, read from it
-                        Console.WriteLine($"Using cached data for store {store.StoreId} from {filePath}");
+                        _logger.LogInformation($"Using cached data for store {store.StoreId} from {filePath}");
                         products = await readStorePricesCsv(filePath);
                         transformToResult(result, store, products);
 
@@ -99,35 +111,37 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                     else
                     {
                         // Otherwise, fetch from the URL
-                        Console.WriteLine($"Fetching data for store {store.StoreId} from {url}");
+                        _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching from {url}");
                         products = await GetStorePrices(url);
                     }
 
                     // Adding the store and products to the result dictionary
                     transformToResult(result, store, products);
 
-                    Console.WriteLine($"Read {products.Count} products for store {store.StoreId}.");
+                    _logger.LogInformation($"Read {products.Count} products for store {store.StoreId}");
                     if (onStoreProcessed != null)
                         onStoreProcessed(store, products);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.Error.WriteLine($"Error processing {url}: {ex.Message}");
+                    throw;
                 }
             }
 
             return result;
         }
 
-        private void transformToResult(Dictionary<StoreInfo, List<PriceInfo>> result, 
+        private void transformToResult(Dictionary<StoreInfo, List<PriceInfo>> result,
             StoreInfoDto store, List<ProductInfoDto> products)
         {
             result.Add(
                 new StoreInfo
                 {
+                    Chain = CHAIN,
+                    Code = store.StoreId,
                     Name = store.Name,
                     StreetAddress = store.StreetAddress,
-                    Zipcode = store.Zipcode,
+                    PostalCode = store.Zipcode,
                     City = store.City
                 },
                 products.Select(p => (PriceInfo)p).ToList()
@@ -230,15 +244,15 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 var p = new ProductInfoDto
                 {
                     Product = csv.GetField("NAZIV PROIZVODA"),
-                    ProductId = csv.GetField("ŠIFRA PROIZVODA"),
+                    ProductCode = csv.GetField("ŠIFRA PROIZVODA"),
                     Brand = csv.GetField("MARKA PROIZVODA"),
                     Quantity = csv.GetField("NETO KOLIČINA"),
                     Unit = csv.GetField("JEDINICA MJERE"),
                     Barcode = csv.GetField("BARKOD"),
                     Category = csv.GetField("KATEGORIJA PROIZVODA"),
-                    Price = csv.TryGetField("MALOPRODAJNA CIJENA", out string pr) 
-                        ? pr 
-                        : csv.TryGetField("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE", out string mpcpob) ? mpcpob 
+                    Price = csv.TryGetField("MALOPRODAJNA CIJENA", out string pr)
+                        ? pr
+                        : csv.TryGetField("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE", out string mpcpob) ? mpcpob
                         : string.Empty,
                     UnitPrice = csv.GetField("CIJENA ZA JEDINICU MJERE"),
                     SpecialPrice = csv.GetField("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE"),
@@ -249,5 +263,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             }
             return results;
         }
+
+        #endregion
     }
 }

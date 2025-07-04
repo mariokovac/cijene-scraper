@@ -1,12 +1,13 @@
-﻿using CijeneScraper.Models;
+﻿using CijeneScraper.Controllers;
+using CijeneScraper.Models;
 using CijeneScraper.Services.Caching;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Net.Http;
 
 namespace CijeneScraper.Crawler
 {
@@ -26,14 +27,20 @@ namespace CijeneScraper.Crawler
         protected readonly ICacheProvider _cache;
 
         /// <summary>
+        /// Logger for logging information and errors during crawling operations.
+        /// </summary>
+        protected readonly ILogger<CrawlerBase> _logger;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="CrawlerBase"/> class.
         /// </summary>
         /// <param name="http">The HTTP client to use for requests.</param>
         /// <param name="cache">The cache provider to use for caching data.</param>
-        protected CrawlerBase(HttpClient http, ICacheProvider cache)
+        protected CrawlerBase(HttpClient http, ICacheProvider cache, ILogger<CrawlerBase> logger)
         {
             _http = http;
             _cache = cache;
+            _logger = logger;
         }
 
         /// <inheritdoc/>
@@ -60,24 +67,6 @@ namespace CijeneScraper.Crawler
             var response = await _http.GetAsync(url);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync();
-        }
-
-        /// <summary>
-        /// Saves the provided rows as a CSV file in the specified folder.
-        /// </summary>
-        /// <param name="folder">The folder where the CSV file will be saved.</param>
-        /// <param name="fileName">The name of the CSV file (without extension).</param>
-        /// <param name="rows">The rows to write to the CSV file.</param>
-        protected void SaveCsv(string folder, string fileName, IEnumerable<string[]> rows)
-        {
-            Directory.CreateDirectory(folder);
-            var path = Path.Combine(folder, fileName + ".csv");
-            using var writer = new StreamWriter(path, false, Encoding.UTF8);
-            foreach (var cols in rows)
-            {
-                // Each value is quoted and inner quotes are escaped
-                writer.WriteLine(string.Join(',', cols.Select(c => $"\"{c.Replace("\"", "\"\"")}\"")));
-            }
         }
     }
 }

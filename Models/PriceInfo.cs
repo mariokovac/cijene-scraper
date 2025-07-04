@@ -8,8 +8,16 @@ namespace CijeneScraper.Models
 {
     public class PriceInfo : IPriceInfo
     {
+        public string ProductCode { get; set; }
         public string Barcode { get; set; }
         public string Name { get; set; }
         public decimal Price { get; set; }
+        public string Brand { get; set; }
+        public string UOM { get; set; }
+        public string Quantity { get; set; }
+        public decimal? PricePerUnit { get; set; }
+        public decimal? SpecialPrice { get; set; }
+        public decimal? BestPrice30 { get; set; }
+        public decimal? AnchorPrice { get; set; }
     }
 }
