@@ -81,12 +81,6 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 return new Dictionary<StoreInfo, List<PriceInfo>>();
             }
 
-#if DEBUG
-            // In debug mode, we limit the number of URLs to process for testing purposes
-            csvUrls = csvUrls.Take(2).ToList();
-            _logger.LogInformation($"Processing {csvUrls.Count} URLs in debug mode.");
-#endif
-
             foreach (var url in csvUrls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -128,6 +122,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 }
             }
 
+            _logger.LogInformation($"Crawled {result.Count} stores for {crawlDate:yyyy-MM-dd}");
             return result;
         }
 

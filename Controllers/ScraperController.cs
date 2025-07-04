@@ -78,18 +78,20 @@ namespace CijeneScraper.Controllers
                 using var transaction = await dbContext.Database.BeginTransactionAsync(token);
                 try
                 {
-                    // 1. Učitaj ili stvori chain
+                    _logger.LogInformation($"Starting DB update for chain: {crawler.Chain} on date: {isoDate:yyyy-MM-dd}");
+
+                    // 1. Load or create chain
                     var chain = await dbContext.Chains
                         .FirstOrDefaultAsync(c => c.Name == crawler.Chain, token)
                         ?? dbContext.Chains.Add(new Chain { Name = crawler.Chain }).Entity;
 
-                    await dbContext.SaveChangesAsync(token); // Potrebno za chain.Id
+                    await dbContext.SaveChangesAsync(token); // Required for chain.Id
 
-                    // 2. Pripremi kolekcije za bulk operacije
+                    // 2. Prepare collections for bulk operations
                     var storeCodes = results.Keys.Select(s => s.Code).ToHashSet();
                     var productCodes = results.Values.SelectMany(p => p.Select(pr => pr.ProductCode)).ToHashSet();
 
-                    // 3. Učitaj postojeće entitete odjednom
+                    // 3. Load existing entities at once
                     var existingStores = await dbContext.Stores
                         .Where(s => s.ChainId == chain.Id && storeCodes.Contains(s.Code))
                         .ToDictionaryAsync(s => s.Code, token);
@@ -106,13 +108,13 @@ namespace CijeneScraper.Controllers
                         .Select(p => new { StoreCode = p.Store.Code, ProductCode = p.ChainProduct.Code, Price = p })
                         .ToDictionaryAsync(x => $"{x.StoreCode}_{x.ProductCode}", x => x.Price, token);
 
-                    // 4. Pripremi nove entitete
+                    // 4. Prepare new entities
                     var newStores = new List<Store>();
                     var newChainProducts = new List<ChainProduct>();
                     var newPrices = new List<Price>();
                     var updatedPrices = new List<Price>();
 
-                    // 5. Obradi stores
+                    // 5. Process stores
                     foreach (var storeInfo in results.Keys)
                     {
                         if (!existingStores.TryGetValue(storeInfo.Code, out var store))
@@ -130,21 +132,21 @@ namespace CijeneScraper.Controllers
                         }
                         else
                         {
-                            // Ažuriraj postojeći store
+                            // Update existing store
                             store.Address = storeInfo.StreetAddress;
                             store.City = storeInfo.City;
                             store.PostalCode = storeInfo.PostalCode;
                         }
                     }
 
-                    // 6. Dodaj nove stores
+                    // 6. Add new stores
                     if (newStores.Any())
                     {
                         dbContext.Stores.AddRange(newStores);
-                        await dbContext.SaveChangesAsync(token); // Potrebno za store.Id
+                        await dbContext.SaveChangesAsync(token); // Required for store.Id
                     }
 
-                    // 7. Obradi chain products
+                    // 7. Process chain products
                     foreach (var priceInfo in results.Values.SelectMany(p => p).GroupBy(p => p.ProductCode))
                     {
                         var productCode = priceInfo.Key;
@@ -167,14 +169,14 @@ namespace CijeneScraper.Controllers
                         }
                     }
 
-                    // 8. Dodaj nove chain products
+                    // 8. Add new chain products
                     if (newChainProducts.Any())
                     {
                         dbContext.ChainProducts.AddRange(newChainProducts);
-                        await dbContext.SaveChangesAsync(token); // Potrebno za chainProduct.Id
+                        await dbContext.SaveChangesAsync(token); // Required for chainProduct.Id
                     }
 
-                    // 9. Obradi prices
+                    // 9. Process prices
                     foreach (var storeInfo in results.Keys)
                     {
                         var store = existingStores[storeInfo.Code];
@@ -201,7 +203,7 @@ namespace CijeneScraper.Controllers
                             }
                             else
                             {
-                                // Ažuriraj postojeći price
+                                // Update existing price
                                 existingPrice.MPC = priceInfo.Price;
                                 existingPrice.PricePerUnit = priceInfo.PricePerUnit;
                                 existingPrice.SpecialPrice = priceInfo.SpecialPrice;
@@ -212,17 +214,18 @@ namespace CijeneScraper.Controllers
                         }
                     }
 
-                    // 10. Dodaj nove prices
+                    // 10. Add new prices
                     if (newPrices.Any())
                     {
                         dbContext.Prices.AddRange(newPrices);
                     }
 
-                    // 11. Spremi sve promjene odjednom
+                    // 11. Save all changes at once
                     int changes = await dbContext.SaveChangesAsync(token);
                     await transaction.CommitAsync(token);
 
-                    _logger.LogInformation("Scraping completed successfully. Changes made: {changes}", changes);
+                    _logger.LogInformation("DB update completed for chain: {chain} on date: {isoDate:yyyy-MM-dd}. Changes made: {changes}",
+                        crawler.Chain, isoDate, changes);
                 }
                 catch
                 {
