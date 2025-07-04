@@ -1,0 +1,6 @@
+@cijene_scraper_HostAddress = http://localhost:5276
+
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum
+Accept: application/json
+
+###
