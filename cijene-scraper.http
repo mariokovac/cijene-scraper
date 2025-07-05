@@ -1,6 +1,10 @@
 @cijene_scraper_HostAddress = http://localhost:5276
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum?date=2025-07-04
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum?date=2025-07-05
+Accept: application/json
+###
+
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland?date=2025-07-05
 Accept: application/json
 ###
 
@@ -10,4 +14,7 @@ Accept: application/json
 
 GET {{cijene_scraper_HostAddress}}/api/prices/CheapestLocation?barcode=8445290308238&date=2025-07-04
 Accept: application/json
+###
+
+GET {{cijene_scraper_HostAddress}}/health
 ###

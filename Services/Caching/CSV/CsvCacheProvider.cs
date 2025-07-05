@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CijeneScraper.Services.Caching.CSV
 {
-    public class CsvCacheProvider : BaseCacheProvider
+    public class CsvCacheProvider : FileBasedCacheProvider
     {
         public override string Extension => ".csv";
 
@@ -39,6 +39,19 @@ namespace CijeneScraper.Services.Caching.CSV
             }
 
             return results;
+        }
+
+        public override async Task ClearAsync(
+            string outputFolder, 
+            DateOnly date, 
+            CancellationToken cancellationToken = default)
+        {
+            var fileName = $"{date:yyyy-MM-dd}";
+            var filePath = GetFilePath(outputFolder, fileName);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
         }
     }
 }

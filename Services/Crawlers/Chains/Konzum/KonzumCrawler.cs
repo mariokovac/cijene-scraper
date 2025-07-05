@@ -1,41 +1,64 @@
 ﻿using CijeneScraper.Crawler;
 using CijeneScraper.Models;
 using CijeneScraper.Services.Caching;
-using CsvHelper;
-using CsvHelper.Configuration;
-using CsvHelper.Configuration.Attributes;
 using HtmlAgilityPack;
 using Microsoft.AspNetCore.WebUtilities;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Formats.Asn1;
 using System.Globalization;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using ZstdSharp.Unsafe;
 
 namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 {
+    /// <summary>
+    /// Crawler implementation for Konzum chain. Handles crawling, parsing, and caching of price lists for Konzum stores.
+    /// </summary>
     public class KonzumCrawler : CrawlerBase
     {
+        /// <summary>
+        /// Chain identifier for Konzum.
+        /// </summary>
         private const string CHAIN = "konzum";
+        /// <summary>
+        /// Base URL for Konzum website.
+        /// </summary>
         private const string BASE_URL = "https://www.konzum.hr";
+        /// <summary>
+        /// URL for the index of price lists.
+        /// </summary>
         private const string INDEX_URL = BASE_URL + "/cjenici";
+        /// <summary>
+        /// Regular expression for parsing store addresses.
+        /// </summary>
         private static readonly Regex AddressPattern = new Regex(@"^(.*)\s+(\d{5})\s+(.*)$", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Path to the cache folder for Konzum data.
+        /// </summary>
         private string cacheFolder = Path.Combine("cache", CHAIN);
 
+        /// <summary>
+        /// Gets the name of the store chain this crawler is associated with.
+        /// </summary>
         public override string Chain { get => CHAIN; }
 
-        public KonzumCrawler(HttpClient http, ICacheProvider cache, ILogger<KonzumCrawler> logger) 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KonzumCrawler"/> class.
+        /// </summary>
+        /// <param name="http">HTTP client for web requests.</param>
+        /// <param name="cache">Cache provider for storing and retrieving data.</param>
+        /// <param name="logger">Logger for logging information and errors.</param>
+        public KonzumCrawler(HttpClient http, ICacheProvider cache, ILogger<KonzumCrawler> logger)
             : base(http, cache, logger) { }
 
+        /// <summary>
+        /// Crawls all Konzum stores and retrieves price information for the specified date.
+        /// </summary>
+        /// <param name="date">The date for which to retrieve prices.</param>
+        /// <param name="cancellationToken">Token to cancel the operation.</param>
+        /// <returns>
+        /// A dictionary mapping <see cref="StoreInfo"/> to a list of <see cref="PriceInfo"/> objects.
+        /// </returns>
         public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
-            DateOnly date, 
+            DateOnly date,
             CancellationToken cancellationToken = default)
         {
             return await _crawlAndProcess(date, cancellationToken, (store, products) =>
@@ -44,6 +67,15 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             });
         }
 
+        /// <summary>
+        /// Asynchronously crawls all Konzum stores and saves the results to the specified output folder.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the results will be saved.</param>
+        /// <param name="date">The date for which to retrieve prices.</param>
+        /// <param name="cancellationToken">Token to cancel the operation.</param>
+        /// <returns>
+        /// A dictionary mapping <see cref="StoreInfo"/> to a list of <see cref="PriceInfo"/> objects.
+        /// </returns>
         public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> CrawlAsync(
             string outputFolder,
             DateOnly date,
@@ -66,28 +98,60 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 
         #region Private Methods
 
+        /// <summary>
+        /// Crawls and processes all available price lists for the given date, optionally invoking a callback for each store.
+        /// </summary>
+        /// <param name="date">The date for which to crawl price lists.</param>
+        /// <param name="cancellationToken">Token to cancel the operation.</param>
+        /// <param name="onStoreProcessed">Optional callback invoked after each store is processed.</param>
+        /// <returns>
+        /// A dictionary mapping <see cref="StoreInfo"/> to a list of <see cref="PriceInfo"/> objects.
+        /// </returns>
         private async Task<Dictionary<StoreInfo, List<PriceInfo>>> _crawlAndProcess(
             DateOnly date,
             CancellationToken cancellationToken = default,
-            Action<StoreInfoDto, List<ProductInfoDto>>? onStoreProcessed = null)
+            Action<StoreInfoDto, List<KonzumCsvRecord>>? onStoreProcessed = null)
         {
             var result = new Dictionary<StoreInfo, List<PriceInfo>>();
 
-            var csvUrls = await GetIndexUrls(date);
+            // Get all CSV URLs for the given date
+            var csvUrls = await getDatasourceUrls(date);
             if (!csvUrls.Any())
             {
                 _logger.LogWarning($"No price list found for {date:yyyy-MM-dd}");
                 return new Dictionary<StoreInfo, List<PriceInfo>>();
             }
 
+            // Dictionary to keep unique store records and their URLs
+            var uniqueRecords = new Dictionary<StoreInfoDto, string>();
+            // HashSet for fast O(1) lookup of processed store IDs
+            var processedStoreIds = new HashSet<string>();
+
             foreach (var url in csvUrls)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var storeInfo = ParseStoreInfo(url);
+                    // Add returns false if already exists
+                    if (processedStoreIds.Add(storeInfo.StoreId))
+                    {
+                        uniqueRecords[storeInfo] = url;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to parse store info from URL: {Url}", url);
+                }
+            }
+
+            foreach (var store in uniqueRecords.Keys)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 try
                 {
-                    StoreInfoDto store = ParseStoreInfo(url);
-                    List<ProductInfoDto> products = null;
+                    List<KonzumCsvRecord> products = null;
 
                     var storeFolder = Path.Combine(cacheFolder, CHAIN);
                     var fileName = $"{store.StoreId}-{date:yyyy-MM-dd}";
@@ -104,11 +168,11 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                     else
                     {
                         // Otherwise, fetch from the URL
-                        _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching from {url}");
-                        products = await GetStorePrices(url);
+                        _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching online");
+                        products = await getUniqueRecordsFromCsv<KonzumCsvRecord>(uniqueRecords[store], o => o.ProductCode);
                     }
 
-                    // Adding the store and products to the result dictionary
+                    // Add the store and products to the result dictionary
                     transformToResult(result, store, products);
 
                     _logger.LogInformation($"Read {products.Count} products for store {store.StoreId}");
@@ -125,8 +189,14 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             return result;
         }
 
+        /// <summary>
+        /// Adds the store and its products to the result dictionary.
+        /// </summary>
+        /// <param name="result">The result dictionary to populate.</param>
+        /// <param name="store">Store information DTO.</param>
+        /// <param name="products">List of products for the store.</param>
         private void transformToResult(Dictionary<StoreInfo, List<PriceInfo>> result,
-            StoreInfoDto store, List<ProductInfoDto> products)
+            StoreInfoDto store, List<KonzumCsvRecord> products)
         {
             result.Add(
                 new StoreInfo
@@ -142,7 +212,12 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             );
         }
 
-        private async Task<List<ProductInfoDto>> readStorePricesCsv(string filePath)
+        /// <summary>
+        /// Reads store prices from a cached CSV file.
+        /// </summary>
+        /// <param name="filePath">Path to the cached CSV file.</param>
+        /// <returns>List of <see cref="KonzumCsvRecord"/> objects.</returns>
+        private async Task<List<KonzumCsvRecord>> readStorePricesCsv(string filePath)
         {
             if (!_cache.Exists(filePath))
             {
@@ -150,11 +225,12 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             }
 
             // Read from cache
-            var results = await _cache.ReadAsync<ProductInfoDto>(filePath); // Ensure cache is read
+            var results = await _cache.ReadAsync<KonzumCsvRecord>(filePath); // Ensure cache is read
             return results.ToList();
         }
 
-        private async Task<List<string>> GetIndexUrls(DateOnly date)
+        /// <inheritdoc/>>
+        protected async override Task<List<string>> getDatasourceUrls(DateOnly date)
         {
             var urls = new List<string>();
             for (int page = 1; page <= 10; page++)
@@ -171,6 +247,11 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             return urls.Distinct().ToList();
         }
 
+        /// <summary>
+        /// Parses the HTML content of the index page and extracts CSV links.
+        /// </summary>
+        /// <param name="html">HTML content of the index page.</param>
+        /// <returns>List of CSV URLs.</returns>
         private List<string> ParseIndex(string html)
         {
             var doc = new HtmlDocument();
@@ -186,6 +267,12 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 .ToList();
         }
 
+        /// <summary>
+        /// Parses store information from the CSV URL.
+        /// </summary>
+        /// <param name="url">CSV URL containing store information in the query string.</param>
+        /// <returns>Parsed <see cref="StoreInfoDto"/> object.</returns>
+        /// <exception cref="Exception">Thrown if the title parameter is missing or address cannot be parsed.</exception>
         private StoreInfoDto ParseStoreInfo(string url)
         {
             var uri = new Uri(url);
@@ -222,42 +309,6 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                 City = city
             };
         }
-
-        private async Task<List<ProductInfoDto>> GetStorePrices(string csvUrl)
-        {
-            var csvText = await FetchTextAsync(csvUrl);
-            using var reader = new StringReader(csvText);
-            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null, BadDataFound = null });
-
-            var results = new List<ProductInfoDto>();
-            await csv.ReadAsync();
-            csv.ReadHeader();
-
-            while (await csv.ReadAsync())
-            {
-                var p = new ProductInfoDto
-                {
-                    Product = csv.GetField("NAZIV PROIZVODA"),
-                    ProductCode = csv.GetField("ŠIFRA PROIZVODA"),
-                    Brand = csv.GetField("MARKA PROIZVODA"),
-                    Quantity = csv.GetField("NETO KOLIČINA"),
-                    Unit = csv.GetField("JEDINICA MJERE"),
-                    Barcode = csv.GetField("BARKOD"),
-                    Category = csv.GetField("KATEGORIJA PROIZVODA"),
-                    Price = csv.TryGetField("MALOPRODAJNA CIJENA", out string pr)
-                        ? pr
-                        : csv.TryGetField("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE", out string mpcpob) ? mpcpob
-                        : string.Empty,
-                    UnitPrice = csv.GetField("CIJENA ZA JEDINICU MJERE"),
-                    SpecialPrice = csv.GetField("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE"),
-                    BestPrice30 = csv.GetField("NAJNIŽA CIJENA U POSLJEDNIH 30 DANA"),
-                    AnchorPrice = csv.GetField("SIDRENA CIJENA NA 2.5.2025")
-                };
-                results.Add(p);
-            }
-            return results;
-        }
-
         #endregion
     }
 }

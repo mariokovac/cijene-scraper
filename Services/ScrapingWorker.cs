@@ -40,7 +40,15 @@ namespace CijeneScraper.Services
                     try
                     {
                         _logger.LogInformation("Starting scraping task...");
-                        await task(stoppingToken);
+                        try
+                        {
+                            await task(stoppingToken);
+                        }
+                        catch
+                        {
+                            _logger.LogWarning("[ERROR] Scraping task failed!");
+                            throw;
+                        }
                         _logger.LogInformation("Scraping task completed.");
                     }
                     catch (Exception ex)

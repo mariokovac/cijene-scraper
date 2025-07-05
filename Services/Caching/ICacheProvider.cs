@@ -22,5 +22,10 @@
         Task<IEnumerable<T>> ReadAsync<T>(string folder, string fileName, CancellationToken ct = default) where T : new();
 
         Task<IEnumerable<T>> ReadAsync<T>(string filePath, CancellationToken ct = default) where T : new();
+
+        Task ClearAsync(
+            string outputFolder, 
+            DateOnly date, 
+            CancellationToken cancellationToken = default);
     }
 }

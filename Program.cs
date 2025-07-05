@@ -3,6 +3,7 @@ using CijeneScraper.Data;
 using CijeneScraper.Data.Repository;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
 using Microsoft.EntityFrameworkCore;
@@ -37,11 +38,15 @@ namespace CijeneScraper
             builder.Services.AddHostedService<ScrapingWorker>();
             builder.Services.AddSingleton<HttpClient>();
             builder.Services.AddSingleton<ICacheProvider, ParquetCacheProvider>();
+
+            #region Crawlers
             builder.Services.AddTransient<ICrawler, KonzumCrawler>();
+            builder.Services.AddTransient<ICrawler, KauflandCrawler>();
             // TODO
-            // To enable other crawlers, uncomment the following lines:
-            // builder.Services.AddTransient<ICrawler, IntersparCrawler>();
-            // builder.Services.AddTransient<ICrawler, LidlCrawler>();
+            //builder.Services.AddTransient<ICrawler, IntersparCrawler>();
+            //builder.Services.AddTransient<ICrawler, LidlCrawler>();
+            //...
+            #endregion
 
             builder.Services.AddScoped<IScrapingDataProcessor, ScrapingDataProcessor>();
 

@@ -2,16 +2,25 @@
 using CijeneScraper.Data;
 using CijeneScraper.Models;
 using CijeneScraper.Models.Database;
+using CijeneScraper.Utility;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
 namespace CijeneScraper.Services.DataProcessor
 {
+    /// <summary>
+    /// Processes and persists scraping results into the database, handling chains, stores, products, and prices.
+    /// </summary>
     public class ScrapingDataProcessor : IScrapingDataProcessor
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ScrapingDataProcessor> _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ScrapingDataProcessor"/> class.
+        /// </summary>
+        /// <param name="scopeFactory">The service scope factory for dependency injection.</param>
+        /// <param name="logger">The logger instance.</param>
         public ScrapingDataProcessor(
             IServiceScopeFactory scopeFactory,
             ILogger<ScrapingDataProcessor> logger)
@@ -20,10 +29,17 @@ namespace CijeneScraper.Services.DataProcessor
             _logger = logger;
         }
 
+        /// <summary>
+        /// Processes the results of a scraping operation and updates the database accordingly.
+        /// </summary>
+        /// <param name="crawler">The crawler that produced the results.</param>
+        /// <param name="results">A dictionary mapping store information to lists of price information.</param>
+        /// <param name="date">The date for which the prices were scraped.</param>
+        /// <param name="token">A cancellation token.</param>
         public async Task ProcessScrapingResultsAsync(
-            ICrawler crawler, 
+            ICrawler crawler,
             Dictionary<StoreInfo, List<PriceInfo>> results,
-            DateOnly date, 
+            DateOnly date,
             CancellationToken token)
         {
             using var scope = _scopeFactory.CreateScope();
@@ -32,35 +48,38 @@ namespace CijeneScraper.Services.DataProcessor
             using var transaction = await dbContext.Database.BeginTransactionAsync(token);
             try
             {
-                var sw = Stopwatch.StartNew();
-                sw.Start();
+                using var timer = new TimedOperation(_logger, "DB update");
 
                 _logger.LogInformation("┌───────────────────────────────────────────────────────────────");
                 _logger.LogInformation("│ ▶️\tStarting DB update for chain: {ChainName} on date: {Date:yyyy-MM-dd}", crawler.Chain, date);
                 _logger.LogInformation("├───────────────────────────────────────────────────────────────");
 
-                // 1. Ensure chain exists
+                // 1. Delete old prices for the date
+                _logger.LogInformation("│   ├─🗑️\t[1/5]\tDeleting old prices for date: {Date:yyyy-MM-dd}", date);
+                await DeletePricesForDate(dbContext, date, crawler.Chain, token);
+
+                // 2. Ensure chain exists
+                _logger.LogInformation("│   ├─✅\t[2/5]\tEnsuring chain exists: {ChainName}", crawler.Chain);
                 var chain = await EnsureChainExistsAsync(dbContext, crawler.Chain, token);
-                _logger.LogInformation("│   ├─✅\tEnsured chain exists: {ChainName}", chain.Name);
 
-                // 2. Process stores
+                // 3. Process stores
+                _logger.LogInformation("│   ├─🏬\t[3/5]\tProcessing stores for chain: {ChainName}", crawler.Chain);
                 await ProcessStoresAsync(dbContext, chain, results.Keys, token);
-                _logger.LogInformation("│   ├─🏬\tProcessed stores for chain: {ChainName}", chain.Name);
 
-                // 3. Process products
+                // 4. Process products
+                _logger.LogInformation("│   ├─📦\t[4/5]\tProcessing products for chain: {ChainName}", crawler.Chain);
                 await ProcessProductsAsync(dbContext, chain, results.Values.SelectMany(p => p), token);
-                _logger.LogInformation("│   ├─📦\tProcessed products for chain: {ChainName}", chain.Name);
 
-                // 4. Process prices
+                // 5. Process prices
+                _logger.LogInformation("│   └─💲\t[5/5]\tProcessing prices for chain: {ChainName}", crawler.Chain);
                 var changesCount = await ProcessPricesAsync(dbContext, chain, results, date, token);
-                _logger.LogInformation("│   └─💲\tProcessed prices for chain: {ChainName}", crawler.Chain);
 
+                _logger.LogInformation("│   └─✅\tCommiting transaction");
                 await transaction.CommitAsync(token);
 
-                sw.Stop();
                 _logger.LogInformation("├───────────────────────────────────────────────────────────────");
-                _logger.LogInformation("│ ✅\tDB update completed for chain: {ChainName} on date: {Date:yyyy-MM-dd}. Time taken: {ElapsedMilliseconds}",
-                    crawler.Chain, date, sw.Elapsed.ToString(@"hh\:mm\:ss"));
+                _logger.LogInformation("│ ✅\tDB update completed for chain: {ChainName} on date: {Date:yyyy-MM-dd}.",
+                    crawler.Chain, date);
                 _logger.LogInformation("└───────────────────────────────────────────────────────────────");
             }
             catch
@@ -70,22 +89,38 @@ namespace CijeneScraper.Services.DataProcessor
             }
             finally
             {
-                var memoryBefore = GC.GetTotalMemory(false);
-                _logger.LogInformation("Memory usage at {Stage}: {Memory:N0} bytes", "Before", memoryBefore);
-
-                results.Clear(); // Clear results to free memory
-                results = null; // Allow GC to collect
+                // Clear results to free memory
+                results.Clear();
+                results = null; // Allow garbage collection
                 dbContext.ChangeTracker.Clear();
 
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect(); // Collect again to ensure all memory is freed
-
-                var memoryAfter = GC.GetTotalMemory(false);
-                _logger.LogInformation("Memory usage at {Stage}: {Memory:N0} bytes", "After", memoryAfter);
             }
         }
 
+        /// <summary>
+        /// Deletes all price records for a specific date and chain from the database.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="date">The date for which to delete prices.</param>
+        /// <param name="chainName">The name of the chain.</param>
+        /// <param name="token">A cancellation token.</param>
+        private async Task DeletePricesForDate(ApplicationDbContext dbContext, DateOnly date, string chainName, CancellationToken token)
+        {
+            await dbContext.Prices
+                .Where(p => p.Date == date && p.Store.Chain.Name == chainName)
+                .ExecuteDeleteAsync(token);
+        }
+
+        /// <summary>
+        /// Ensures that a chain with the specified name exists in the database, creating it if necessary.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="chainName">The name of the chain.</param>
+        /// <param name="token">A cancellation token.</param>
+        /// <returns>The <see cref="Chain"/> entity.</returns>
         private async Task<Chain> EnsureChainExistsAsync(ApplicationDbContext dbContext, string chainName, CancellationToken token)
         {
             var chain = await dbContext.Chains
@@ -101,6 +136,13 @@ namespace CijeneScraper.Services.DataProcessor
             return chain;
         }
 
+        /// <summary>
+        /// Processes and updates store information for a chain, adding new stores or updating existing ones.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="chain">The chain entity.</param>
+        /// <param name="storeInfos">A collection of store information.</param>
+        /// <param name="token">A cancellation token.</param>
         private async Task ProcessStoresAsync(ApplicationDbContext dbContext, Chain chain, IEnumerable<StoreInfo> storeInfos, CancellationToken token)
         {
             var storeCodes = storeInfos.Select(s => s.Code).ToHashSet();
@@ -127,7 +169,7 @@ namespace CijeneScraper.Services.DataProcessor
                 }
                 else
                 {
-                    // Update existing store
+                    // Update existing store with new address, city, and postal code
                     store.Address = storeInfo.StreetAddress;
                     store.City = storeInfo.City;
                     store.PostalCode = storeInfo.PostalCode;
@@ -141,6 +183,13 @@ namespace CijeneScraper.Services.DataProcessor
             }
         }
 
+        /// <summary>
+        /// Processes and updates product information for a chain, adding new products as needed.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="chain">The chain entity.</param>
+        /// <param name="priceInfos">A collection of price information containing product data.</param>
+        /// <param name="token">A cancellation token.</param>
         private async Task ProcessProductsAsync(ApplicationDbContext dbContext, Chain chain, IEnumerable<PriceInfo> priceInfos, CancellationToken token)
         {
             var productCodes = priceInfos.Select(p => p.ProductCode).ToHashSet();
@@ -180,20 +229,31 @@ namespace CijeneScraper.Services.DataProcessor
             }
         }
 
+        /// <summary>
+        /// Processes and updates price information for a chain, adding new prices or updating existing ones.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="chain">The chain entity.</param>
+        /// <param name="results">A dictionary mapping store information to lists of price information.</param>
+        /// <param name="date">The date for which the prices are being processed.</param>
+        /// <param name="token">A cancellation token.</param>
+        /// <returns>The number of state entries written to the database.</returns>
         private async Task<int> ProcessPricesAsync(ApplicationDbContext dbContext, Chain chain, Dictionary<StoreInfo, List<PriceInfo>> results, DateOnly date, CancellationToken token)
         {
             var storeCodes = results.Keys.Select(s => s.Code).ToHashSet();
             var productCodes = results.Values.SelectMany(p => p.Select(pr => pr.ProductCode)).ToHashSet();
 
-            // Load existing entities
+            // Load existing stores for the chain
             var existingStores = await dbContext.Stores
                 .Where(s => s.ChainId == chain.Id && storeCodes.Contains(s.Code))
                 .ToDictionaryAsync(s => s.Code, token);
 
+            // Load existing products for the chain
             var existingChainProducts = await dbContext.ChainProducts
                 .Where(cp => cp.ChainId == chain.Id && productCodes.Contains(cp.Code))
                 .ToDictionaryAsync(cp => cp.Code, token);
 
+            // Load existing prices for the given date, stores, and products
             var existingPrices = await dbContext.Prices
                 .Where(p => p.Store.ChainId == chain.Id &&
                            storeCodes.Contains(p.Store.Code) &&
@@ -215,6 +275,7 @@ namespace CijeneScraper.Services.DataProcessor
 
                     if (!existingPrices.TryGetValue(priceKey, out var existingPrice))
                     {
+                        // Add new price entry
                         var newPrice = new Price
                         {
                             Store = store,
@@ -230,7 +291,7 @@ namespace CijeneScraper.Services.DataProcessor
                     }
                     else
                     {
-                        // Update existing price
+                        // Update existing price entry
                         existingPrice.MPC = priceInfo.Price;
                         existingPrice.PricePerUnit = priceInfo.PricePerUnit;
                         existingPrice.SpecialPrice = priceInfo.SpecialPrice;

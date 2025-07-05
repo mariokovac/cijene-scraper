@@ -1,48 +1,46 @@
 ﻿using CijeneScraper.Models;
+using CsvHelper.Configuration.Attributes;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 {
-    /// <summary>
-    /// Data transfer object representing product information scraped from Konzum.
-    /// </summary>
-    internal class ProductInfoDto
+    public class KonzumCsvRecord
     {
-        /// <summary>Product name.</summary>
+        [Name("NAZIV PROIZVODA")]
         public string Product { get; set; }
 
-        /// <summary>Unique product identifier.</summary>
+        [Name("ŠIFRA PROIZVODA")]
         public string ProductCode { get; set; }
 
-        /// <summary>Brand of the product.</summary>
+        [Name("MARKA PROIZVODA")]
         public string Brand { get; set; }
 
-        /// <summary>Quantity of the product (e.g., "1", "500").</summary>
+        [Name("NETO KOLIČINA")]
         public string Quantity { get; set; }
 
-        /// <summary>Unit of measure (e.g., "g", "ml", "kom").</summary>
+        [Name("JEDINICA MJERE")]
         public string Unit { get; set; }
 
-        /// <summary>Product barcode.</summary>
+        [Name("BARKOD")]
         public string Barcode { get; set; }
 
-        /// <summary>Product category.</summary>
+        [Name("KATEGORIJA PROIZVODA")]
         public string Category { get; set; }
 
-        /// <summary>Product price as string (should be parseable to decimal).</summary>
+        [Name("MALOPRODAJNA CIJENA")]
         public string Price { get; set; }
 
-        /// <summary>Unit price as string (should be parseable to decimal).</summary>
+        [Name("CIJENA ZA JEDINICU MJERE")]
         public string UnitPrice { get; set; }
 
-        /// <summary>Special price as string (should be parseable to decimal).</summary>
+        [Name("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE")]
         public string SpecialPrice { get; set; }
 
-        /// <summary>Best price in the last 30 days as string (should be parseable to decimal).</summary>
+        [Name("NAJNIŽA CIJENA U POSLJEDNIH 30 DANA")]
         public string BestPrice30 { get; set; }
 
-        /// <summary>Anchor price as string (should be parseable to decimal).</summary>
+        [Name("SIDRENA CIJENA NA 2.5.2025")]
         public string AnchorPrice { get; set; }
 
         private static Regex _uomCleanupRegex = new Regex(@"[^\d\.]", RegexOptions.Compiled);
@@ -51,8 +49,8 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
         /// Explicit conversion operator to <see cref="PriceInfo"/>.
         /// Converts only relevant fields: Barcode, Name, and Price.
         /// </summary>
-        /// <param name="p">The <see cref="ProductInfoDto"/> instance.</param>
-        public static explicit operator PriceInfo(ProductInfoDto p)
+        /// <param name="p">The <see cref="KonzumCsvRecord"/> instance.</param>
+        public static explicit operator PriceInfo(KonzumCsvRecord p)
         {
             return new PriceInfo
             {

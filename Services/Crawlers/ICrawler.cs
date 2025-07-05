@@ -44,5 +44,10 @@ namespace CijeneScraper.Crawler
         /// Gets the name of the store chain this crawler is associated with.
         /// </summary>
         string Chain { get; }
+
+        Task ClearCacheAsync(
+            string outputFolder,
+            DateOnly date,
+            CancellationToken cancellationToken = default);
     }
 }
