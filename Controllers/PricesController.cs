@@ -6,21 +6,35 @@ using CijeneScraper.Models.ViewModel;
 
 namespace CijeneScraper.Controllers
 {
+    /// <summary>
+    /// Controller for handling price-related API endpoints.
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class PricesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PricesController"/> class.
+        /// </summary>
+        /// <param name="context">The database context.</param>
         public PricesController(ApplicationDbContext context)
         {
             _context = context;
         }
 
+        /// <summary>
+        /// Retrieves a list of prices for the specified dates and optional chain.
+        /// </summary>
+        /// <param name="dates">Array of dates to filter prices (required).</param>
+        /// <param name="take">Maximum number of results to return (default: 100).</param>
+        /// <param name="chain">Optional chain name to filter results.</param>
+        /// <returns>A list of <see cref="PriceViewModel"/> objects matching the criteria.</returns>
         // GET: api/Prices
         public async Task<ActionResult<IEnumerable<PriceViewModel>>> GetPrices(
-            [FromQuery] DateOnly[] dates, 
-            int take = 100, 
+            [FromQuery] DateOnly[] dates,
+            int take = 100,
             string chain = null)
         {
             // Validate the dates parameter
@@ -28,7 +42,7 @@ namespace CijeneScraper.Controllers
             {
                 return BadRequest("Dates parameter is required.");
             }
-            // Ensure dates are in UTC and distinct
+            // Ensure dates are distinct
             dates = dates.Distinct().ToArray();
 
             return await _context.Prices
@@ -48,26 +62,24 @@ namespace CijeneScraper.Controllers
                 .ToListAsync();
         }
 
-        public class CheapestLocationViewModel
-        {
-            public string ProductName { get; set; }
-            public string Address { get; set; }
-            public string PostalCode { get; set; }
-            public string City { get; set; }
-            public decimal Price { get; set; }
-            public DateOnly Date { get; set; }
-        }
-
+        /// <summary>
+        /// Retrieves the locations with the lowest price for a product by barcode on a specific date.
+        /// </summary>
+        /// <param name="barcode">The product barcode (required).</param>
+        /// <param name="date">The date to search for prices (optional, defaults to today).</param>
+        /// <returns>A list of <see cref="CheapestLocationViewModel"/> for the lowest price locations.</returns>
         // GET: api/Prices/CheapestLocation?barcode=1234567890123&date=2025-07-15
         [HttpGet("CheapestLocation")]
         public async Task<ActionResult<IEnumerable<CheapestLocationViewModel>>> GetCheapestLocation(string barcode, DateOnly? date = null)
         {
-            if(barcode == null)
+            // Validate the barcode parameter
+            if (barcode == null)
             {
                 return BadRequest("Barcode parameter is required.");
             }
 
-            if(date == null)
+            // Use today's date if not provided
+            if (date == null)
                 date = DateOnly.FromDateTime(DateTime.UtcNow.Date);
 
             var prices = await _context.Prices
@@ -91,23 +103,6 @@ namespace CijeneScraper.Controllers
 
             // Return all locations with the lowest price
             return prices.Where(p => p.Price == lowestPrice).ToList();
-        }
-
-        // GET: api/Prices/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Price>> GetPrice(long id)
-        {
-            var price = await _context.Prices
-                .Include(p => p.ChainProduct)
-                .Include(p => p.Store)
-                .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (price == null)
-            {
-                return NotFound();
-            }
-
-            return price;
         }
     }
 }
