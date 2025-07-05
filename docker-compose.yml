@@ -10,6 +10,7 @@ services:
     ports:
       - "5432:5432"
   app:
+    container_name: cijene_scraper
     build: .
     depends_on:
       - db
