@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:15
+    container_name: postgres_db
     restart: always
     env_file:
       - .env
@@ -24,8 +25,10 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=${ConnectionStrings__DefaultConnection}
+    volumes:
+      - ./ScrapedData:/app/ScrapedData
     ports:
-      - "8080:8080"
+      - "${APP_PORT}:8080"
 
 volumes:
   db_data:

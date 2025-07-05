@@ -73,6 +73,7 @@ namespace CijeneScraper.Controllers
         /// A list of <see cref="PriceByBarcodeViewModel"/> objects
         /// Returns <c>400 Bad Request</c> if the barcode parameter is missing.
         /// </returns>
+        [HttpGet("ByBarcode")]
         public async Task<ActionResult<IEnumerable<PriceByBarcodeViewModel>>> GetPricesByBarcodeForDay(
             [FromQuery] string barcode,
             [FromQuery] DateOnly? date = null)
