@@ -1,98 +1,185 @@
-﻿# cijene-scraper
+﻿# Cijene Scraper
 
-## Opis
-cijene-scraper je ASP.NET Core Web API projekt za scraping i pohranu cijena proizvoda iz maloprodajnih lanaca.
+ASP.NET Core Web API projekt za scraping i pohranu cijena proizvoda iz maloprodajnih lanaca u Hrvatskoj.
 
-## Značajke
-- Web API za pokretanje scraping zadataka
-- Parsiranje cijena i informacija o proizvodima
-- Pohrana podataka u PostgreSQL bazu (EF Core)
-- Keširanje podataka u CSV i Parquet formatu
-- Docker i Docker Compose podrška
-- Automatsko primjenjivanje EF Core migracija pri pokretanju
+## 🚀 Značajke
 
-## Tehnologije
-- .NET 9 (ASP.NET Core)
-- Entity Framework Core (Npgsql)
-- HtmlAgilityPack
-- CsvHelper
-- Parquet.Net
-- ZstdSharp
-- Docker, Docker Compose
-- NSwag (Swagger UI)
+- **Web API** za pokretanje scraping zadataka
+- **Parsiranje cijena** i informacija o proizvodima
+- **Pohrana podataka** u PostgreSQL bazu (Entity Framework Core)
+- **Keširanje podataka** u CSV i Parquet formatu
+- **Docker podrška** s Docker Compose
+- **Automatsko primjenjivanje** EF Core migracija pri pokretanju
+- **Swagger UI** za testiranje API-ja
 
-## Instalacija
-1. Klonirajte repozitorij:
-   ```bash
-   git clone <URL repozitorija>
-   ```
-2. Prijeđite u direktorij projekta:
-   ```bash
-   cd cijene-scraper
-   ```
-3. Instalirajte .NET 9 SDK (ako već nije instaliran).
-4. Konfigurirajte varijable okoline u `.env` datoteci:
-   ```ini
-   POSTGRES_USER=scraper_user
-   POSTGRES_PASSWORD=scraper_password
-   POSTGRES_DB=cjene_scraper
-   ```
-5. Ažurirajte `appsettings.json` po potrebi (poveznica na bazu podataka).
+## 🛠️ Tehnologije
 
-## Pokretanje
+- **.NET 9** (ASP.NET Core)
+- **Entity Framework Core** (Npgsql)
+- **PostgreSQL** baza podataka
+- **HtmlAgilityPack** za HTML parsiranje
+- **CsvHelper** za CSV export
+- **Parquet.Net** za Parquet format
+- **ZstdSharp** za kompresiju
+- **Docker & Docker Compose**
+- **NSwag** (Swagger UI)
 
-### Lokalno
+## 📋 Preduvjeti
+
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Docker](https://www.docker.com/) i [Docker Compose](https://docs.docker.com/compose/) (za Docker pokretanje)
+- [PostgreSQL](https://www.postgresql.org/) (ako pokretate izvan Dockera)
+
+## 🔧 Instalacija
+
+### Kloniranje repozitorija
+
 ```bash
-dotnet run
+git clone https://github.com/mariokovac/cijene-scraper.git
+cd cijene-scraper
 ```
-API će biti dostupan na `http://localhost:8080`.
 
-### Docker Compose
+### Konfiguracija
+
+1. Prilagodite varijable okoline u `.env`:
+```bash
+POSTGRES_USER=scraper_user
+POSTGRES_PASSWORD=scraper_password
+POSTGRES_DB=cijene_scraper
+```
+
+2. Ažurirajte `appsettings.json` po potrebi (poveznica na bazu podataka).
+
+## 🐳 Pokretanje s Dockerom (preporučeno)
+
 ```bash
 docker-compose up -d
 ```
-Servis će biti dostupan na `http://localhost:8080`.
 
-## API
+API će biti dostupan na http://localhost:8080
 
-### Provjera zdravlja (health check)
-- `GET /health`  
-  Vraća `OK` ako je aplikacija u redu.
+## 🏃‍♂️ Pokretanje lokalno
 
-### Pokretanje scraping zadatka
-- `POST /api/scraper/start/{lanac}?date=YYYY-MM-DD`  
-  Pokreće scraping za zadani lanac (npr. `konzum`). Parametar `date` je opcionalan; ako nije naveden, koristi se trenutni datum.
+```bash
+dotnet restore
+dotnet run
+```
 
-Primjer:
+API će biti dostupan na http://localhost:8080
+
+## 📚 API Dokumentacija
+
+### Health Check
+```http
+GET /health
+```
+Vraća `OK` ako je aplikacija u redu.
+
+### Pokretanje scrapinga
+```http
+POST /api/scraper/start/{lanac}?date=YYYY-MM-DD
+```
+
+**Parametri:**
+- `lanac` (obavezno): Naziv lanca (npr. `konzum`)
+- `date` (opcionalno): Datum u formatu YYYY-MM-DD. Ako nije naveden, koristi se trenutni datum.
+
+**Primjer:**
 ```http
 POST http://localhost:8080/api/scraper/start/konzum?date=2025-07-04
 ```
 
-## Struktura projekta
-```
-cijene-scraper/
-├── Controllers/         // API kontroleri (Health, Scraper)
-├── Models/              // Modeli podataka i DTO
-│   └── Database/        // EF Core entiteti (Chain, ChainProduct, Price, Store)
-├── Data/                // ApplicationDbContext
-├── Services/            // ScrapingQueue, ScrapingWorker, Crawlers, Caching
-│   ├── Crawlers/        // Implementacija ICrawler za pojedine lance
-│   └── Caching/         // ICacheProvider: CSV i Parquet
-├── Program.cs           // Glavna konfiguracija i startup
-├── appsettings.json     // Postavke aplikacije
-├── .env                 // Varijable okoline za Docker Compose
-├── Dockerfile
-├── docker-compose.yml
-└── LICENSE.txt
+### Dohvaćanje cijena
+```http
+GET /api/prices?dates=2025-07-04&dates=2025-07-05&take=100&chain=konzum
 ```
 
-## Dodavanje novog crawlera
-1. Implementirajte sučelje `ICrawler` u `Services/Crawlers/Chains/`.
-2. Registrirajte novi crawler u `Program.cs` pomoću:
-   ```csharp
-   builder.Services.AddTransient<ICrawler, NoviLanacCrawler>();
-   ```
+**Parametri:**
+- `dates` (obavezno): Niz datuma u formatu YYYY-MM-DD
+- `take` (opcionalno): Maksimalni broj rezultata (default: 100)
+- `chain` (opcionalno): Naziv lanca za filtriranje
 
-## Licenca
-Projekt je dostupan pod MIT licencom. Pogledajte `LICENSE.txt` za više informacija.
+**Primjer:**
+```http
+GET http://localhost:8080/api/prices?dates=2025-07-04&dates=2025-07-05&chain=konzum
+```
 
+### Pronalaženje najjeftinijih lokacija
+```http
+GET /api/prices/CheapestLocation?barcode=1234567890123&date=2025-07-04
+```
+
+**Parametri:**
+- `barcode` (obavezno): Barkod proizvoda
+- `date` (opcionalno): Datum pretrage (default: danas)
+
+**Primjer:**
+```http
+GET http://localhost:8080/api/prices/CheapestLocation?barcode=1234567890123
+```
+
+### Swagger UI
+Dostupan na http://localhost:8080/swagger za interaktivno testiranje API-ja.
+
+
+
+## 🔧 Dodavanje novog lanca
+
+1. Implementirajte sučelje `ICrawler` u `Services/Crawlers/Chains/`:
+```csharp
+public class NoviLanacCrawler : ICrawler
+{
+    // Implementacija crawlera
+}
+```
+
+2. Registrirajte novi crawler u `Program.cs`:
+```csharp
+builder.Services.AddTransient<ICrawler, NoviLanacCrawler>();
+```
+
+## 🗄️ Baza podataka
+
+Projekt koristi PostgreSQL bazu podataka s Entity Framework Core. Migracije se automatski primjenjuju pri pokretanju aplikacije.
+
+### Glavne tablice:
+- `Chains` - Informacije o lancima
+- `Stores` - Trgovine po lancima
+- `ChainProducts` - Proizvodi po lancima
+- `Prices` - Povijesne cijene proizvoda
+
+## 📊 Keširanje podataka
+
+Podaci se automatski keširaju u dva formata:
+- **CSV** - Za jednostavno čitanje i analizu
+- **Parquet** - Za efikasniju pohranu i analizu velikih količina podataka
+
+## 🐛 Debugging
+
+### Logovi
+Aplikacija koristi standardni .NET logging. Logovi su dostupni u konzoli ili Docker logs:
+
+```bash
+docker-compose logs -f
+```
+
+### Baza podataka
+Za pristup bazi podataka možete koristiti:
+
+```bash
+docker exec -it cijene-scraper-db-1 psql -U scraper_user -d cijene_scraper
+```
+
+## 📄 Licenca
+
+Ovaj projekt je licenciran pod MIT licencom. Pogledajte [LICENSE.txt](LICENSE.txt) za više informacija.
+
+## 📞 Kontakt
+
+Mario Kovač - [@mariokovac](https://github.com/mariokovac)
+
+Project Link: [https://github.com/mariokovac/cijene-scraper](https://github.com/mariokovac/cijene-scraper)
+
+---
+
+⭐ Ako vam je ovaj projekt koristan, molimo dajte mu zvjezdicu!
