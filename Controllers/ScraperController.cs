@@ -60,20 +60,51 @@ namespace CijeneScraper.Controllers
             }
 
             date ??= DateOnly.FromDateTime(DateTime.UtcNow);
-
             _logger.LogInformation($"Received scraping request for chain: {chain} on date: {date:yyyy-MM-dd}", chain, date);
+
+            bool wasRunning = _queue.IsRunning;
+            if (wasRunning)
+            {
+                _logger.LogInformation("Previous scraping job was running and will be cancelled.");
+            }
 
             _queue.Enqueue(async token =>
             {
-                var results = await crawler.CrawlAsync(outputFolder, date.Value, token);
-                await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, token);
-                await crawler.ClearCacheAsync(outputFolder, date.Value, token);
-                results = null; // Clear results to free memory
+                try
+                {
+                    _logger.LogInformation($"Starting scraping job for chain {chain} on date {date:yyyy-MM-dd}");
 
-                _logger.LogInformation($"Scraping job for chain {chain} completed successfully.", crawler.Chain);
+                    var results = await crawler.CrawlAsync(outputFolder, date.Value, token);
+
+                    // Provjeri da li je zadatak prekinut
+                    token.ThrowIfCancellationRequested();
+
+                    await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, token);
+
+                    // Provjeri da li je zadatak prekinut
+                    token.ThrowIfCancellationRequested();
+
+                    await crawler.ClearCacheAsync(outputFolder, date.Value, token);
+
+                    results = null; // Clear results to free memory
+                    _logger.LogInformation($"Scraping job for chain {chain} completed successfully.", crawler.Chain);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation($"Scraping job for chain {chain} was cancelled.");
+                    throw; // Re-throw to let the queue handle it
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error occurred during scraping for chain {chain}");
+                    throw; // Re-throw to let the queue handle it
+                }
             });
 
-            return Accepted($"Scraping job for chain '{chain}' added to the queue for date {date:yyyy-MM-dd}.");
+            if (wasRunning)
+                return Accepted($"Previous scraping job was cancelled. New scraping job for chain '{chain}' started for date {date:yyyy-MM-dd}.");
+            else
+                return Accepted($"Scraping job for chain '{chain}' added to the queue for date {date:yyyy-MM-dd}.");
         }
     }
 }
