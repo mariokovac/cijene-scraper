@@ -81,6 +81,8 @@ namespace CijeneScraper.Migrations
 
                     b.HasIndex("ChainId");
 
+                    b.HasIndex(new[] { "Barcode" }, "IX_ChainProducts_Barcode");
+
                     b.ToTable("ChainProducts");
                 });
 

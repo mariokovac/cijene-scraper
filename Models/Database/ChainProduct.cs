@@ -1,9 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Xml.Linq;
 
 namespace CijeneScraper.Models.Database
 {
     [Table("ChainProducts")]
+    [Index(nameof(Barcode), Name = "IX_ChainProducts_Barcode")]
     public class ChainProduct
     {
         [Key]
@@ -11,8 +14,6 @@ namespace CijeneScraper.Models.Database
         public long Id { get; set; }
 
         public int ChainId { get; set; }
-
-        //public long ProductId { get; set; }
 
         [Required]
         public string Code { get; set; } = null!;

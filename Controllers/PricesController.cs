@@ -63,6 +63,45 @@ namespace CijeneScraper.Controllers
         }
 
         /// <summary>
+        /// Retrieves a list of prices for a specific product (by barcode) on a given date across all stores and chains.
+        /// </summary>
+        /// <param name="barcode">The product barcode (required).</param>
+        /// <param name="date">
+        /// The date for which to retrieve prices (optional, defaults to today if not provided).
+        /// </param>
+        /// <returns>
+        /// A list of <see cref="PriceByBarcodeViewModel"/> objects
+        /// Returns <c>400 Bad Request</c> if the barcode parameter is missing.
+        /// </returns>
+        public async Task<ActionResult<IEnumerable<PriceByBarcodeViewModel>>> GetPricesByBarcodeForDay(
+            [FromQuery] string barcode,
+            [FromQuery] DateOnly? date = null)
+        {
+            // Validate the barcode parameter
+            if (string.IsNullOrEmpty(barcode))
+            {
+                return BadRequest("Barcode parameter is required.");
+            }
+            // Use today's date if not provided
+            if (date == null)
+                date = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+            var prices = await _context.Prices
+                .Include(p => p.ChainProduct)
+                .Include(p => p.Store)
+                .Where(p => p.ChainProduct.Barcode == barcode && p.Date == date.Value)
+                .Select(p => new PriceByBarcodeViewModel
+                {
+                    Date = p.Date,
+                    ChainName = p.ChainProduct.Chain.Name,
+                    StoreName = p.Store.Address + ", " + p.Store.PostalCode + " " + p.Store.City,
+                    ProductName = p.ChainProduct.Name,
+                    Price = p.MPC ?? p.SpecialPrice ?? 0m
+                })
+                .ToListAsync();
+            return prices;
+        }
+
+        /// <summary>
         /// Retrieves the locations with the lowest price for a product by barcode on a specific date.
         /// </summary>
         /// <param name="barcode">The product barcode (required).</param>
@@ -85,10 +124,12 @@ namespace CijeneScraper.Controllers
             var prices = await _context.Prices
                 .Include(p => p.ChainProduct)
                 .Include(p => p.Store)
+                .Include(p => p.Store.Chain)
                 .Where(p => p.ChainProduct.Barcode == barcode && p.Date == date.Value)
                 .OrderBy(p => p.MPC ?? p.SpecialPrice)
                 .Select(p => new CheapestLocationViewModel
                 {
+                    Chain = p.Store.Chain.Name,
                     Date = p.Date,
                     ProductName = p.ChainProduct.Name,
                     Address = p.Store.Address,

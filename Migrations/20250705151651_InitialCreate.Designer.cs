@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CijeneScraper.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250704125828_InitialCreate")]
+    [Migration("20250705151651_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -83,6 +83,8 @@ namespace CijeneScraper.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ChainId");
+
+                    b.HasIndex(new[] { "Barcode" }, "IX_ChainProducts_Barcode");
 
                     b.ToTable("ChainProducts");
                 });

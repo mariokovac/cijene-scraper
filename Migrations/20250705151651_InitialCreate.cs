@@ -110,6 +110,11 @@ namespace CijeneScraper.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChainProducts_Barcode",
+                table: "ChainProducts",
+                column: "Barcode");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ChainProducts_ChainId",
                 table: "ChainProducts",
                 column: "ChainId");

@@ -2,6 +2,7 @@
 {
     public class CheapestLocationViewModel
     {
+        public string Chain { get; set; }
         public string ProductName { get; set; }
         public string Address { get; set; }
         public string PostalCode { get; set; }
