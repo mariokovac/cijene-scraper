@@ -3,6 +3,7 @@ using CijeneScraper.Data;
 using CijeneScraper.Data.Repository;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Services.Caching.CSV;
 using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
@@ -23,6 +24,7 @@ namespace CijeneScraper
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            var cachingEngine = builder.Configuration["Caching:Engine"]?.ToLowerInvariant() ?? "parquet";
 
             // Add EF Core DbContext
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -37,7 +39,11 @@ namespace CijeneScraper
             builder.Services.AddSingleton<ScrapingQueue>();
             builder.Services.AddHostedService<ScrapingWorker>();
             builder.Services.AddSingleton<HttpClient>();
-            builder.Services.AddSingleton<ICacheProvider, ParquetCacheProvider>();
+
+            if(cachingEngine == "csv")
+                builder.Services.AddSingleton<ICacheProvider, CsvCacheProvider>();
+            else
+                builder.Services.AddSingleton<ICacheProvider, ParquetCacheProvider>();
 
             #region Crawlers
             builder.Services.AddTransient<ICrawler, KonzumCrawler>();
