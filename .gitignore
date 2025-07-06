@@ -63,6 +63,8 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+appsettings.Development.json
+appsettings.Local.json
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -362,3 +364,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/appsettings.Development.json
