@@ -127,6 +127,19 @@ namespace CijeneScraper.Controllers
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, $"Error occurred during scraping for chain {chain}");
+                    try
+                    {
+                        await _emailService.SendAsync(
+                            $"Scraping failed for [{chain} - {date:yyyy-MM-dd}]",
+                            $"An error occurred during the scraping job for chain '{chain}' on date {date:yyyy-MM-dd}.\n\r" +
+                            $"Error: {ex.Message}\n\rStack Trace: {ex.StackTrace}"
+                        );
+                        _logger.LogInformation($"Email notification sent for scraping failure of chain {chain}.");
+                    }
+                    catch (SmtpException smtpEx)
+                    {
+                        _logger.LogError(smtpEx, "Failed to send email notification for scraping failure.");
+                    }
                     throw; // Re-throw to let the queue handle it
                 }
             });
