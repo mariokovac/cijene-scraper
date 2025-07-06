@@ -90,12 +90,12 @@ namespace CijeneScraper.Controllers
 
                     var results = await crawler.CrawlAsync(outputFolder, date.Value, token);
 
-                    // Provjeri da li je zadatak prekinut
+                    // Check if the task was cancelled before processing results
                     token.ThrowIfCancellationRequested();
 
-                    await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, token);
+                    int changes = await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, token);
 
-                    // Provjeri da li je zadatak prekinut
+                    // Check again if the task was cancelled after processing results
                     token.ThrowIfCancellationRequested();
 
                     await crawler.ClearCacheAsync(outputFolder, date.Value, token);
@@ -109,8 +109,9 @@ namespace CijeneScraper.Controllers
                         timer.Stop();
                         await _emailService.SendAsync(
                             $"Scraping completed for [{chain} - {date:yyyy-MM-dd}]",
-                            $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r " +
-                            $"Time taken {timer.Elapsed.ToString("hh\\:mm\\:ss\\.fff")}"
+                            $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
+                            $"Time taken {timer.Elapsed.ToString("hh\\:mm\\:ss\\.fff")}\n\r" +
+                            $"Total changes detected: {changes}\n\r"
                         );
                         _logger.LogInformation($"Email notification sent for scraping completion of chain {chain}.");
                     }

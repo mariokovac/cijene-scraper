@@ -36,12 +36,14 @@ namespace CijeneScraper.Services.DataProcessor
         /// <param name="results">A dictionary mapping store information to lists of price information.</param>
         /// <param name="date">The date for which the prices were scraped.</param>
         /// <param name="token">A cancellation token.</param>
-        public async Task ProcessScrapingResultsAsync(
+        /// <returns>The number of state entries written to the database as a result of the operation.</returns>
+        public async Task<int> ProcessScrapingResultsAsync(
             ICrawler crawler,
             Dictionary<StoreInfo, List<PriceInfo>> results,
             DateOnly date,
             CancellationToken token)
         {
+            int changesCount = 0;
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
@@ -72,7 +74,7 @@ namespace CijeneScraper.Services.DataProcessor
 
                 // 5. Process prices
                 _logger.LogInformation("│   └─💲\t[5/5]\tProcessing prices for chain: {ChainName}", crawler.Chain);
-                var changesCount = await ProcessPricesAsync(dbContext, chain, results, date, token);
+                changesCount = await ProcessPricesAsync(dbContext, chain, results, date, token);
 
                 _logger.LogInformation("│   └─✅\tCommiting transaction");
                 await transaction.CommitAsync(token);
@@ -98,6 +100,8 @@ namespace CijeneScraper.Services.DataProcessor
                 GC.WaitForPendingFinalizers();
                 GC.Collect(); // Collect again to ensure all memory is freed
             }
+
+            return changesCount;
         }
 
         /// <summary>
