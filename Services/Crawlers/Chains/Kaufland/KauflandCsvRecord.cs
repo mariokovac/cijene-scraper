@@ -85,7 +85,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
                 Price = decimal.TryParse(p.Price, NumberStyles.Any, NumberFormatInfo, out var price) ? price : 0m,
                 Brand = p.Brand,
                 UOM = p.UOM,
-                Quantity = p.Quantity.Trim(),
+                Quantity = p.Quantity?.Trim(),
                 PricePerUnit = decimal.TryParse(p.PricePerUnit, NumberStyles.Any, NumberFormatInfo, out var unitPrice) ? unitPrice : (decimal?)null,
                 SpecialPrice = decimal.TryParse(p.SpecialPrice, NumberStyles.Any, NumberFormatInfo, out var specialPrice) ? specialPrice : (decimal?)null,
                 BestPrice30 = decimal.TryParse(p.BestPrice30, NumberStyles.Any, NumberFormatInfo, out var bestPrice30) ? bestPrice30 : (decimal?)null,
