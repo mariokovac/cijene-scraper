@@ -6,6 +6,7 @@ using CsvHelper.Configuration;
 using HtmlAgilityPack;
 using System.Globalization;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -167,7 +168,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
                         // Otherwise, fetch from the URL
                         _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching online!");
                         products = await getUniqueRecordsFromCsv<KauflandCsvRecord>(
-                            uniqueRecords[store],
+                            await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1252")),
                             o => o.ProductCode,
                             new CsvConfiguration(CultureInfo.InvariantCulture)
                             {

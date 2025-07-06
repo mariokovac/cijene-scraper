@@ -4,7 +4,7 @@ POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum?date=2025-07-05
 Accept: application/json
 ###
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland?date=2025-07-05
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland?date=2025-07-06
 Accept: application/json
 ###
 

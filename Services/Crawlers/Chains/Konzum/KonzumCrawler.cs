@@ -169,7 +169,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
                     {
                         // Otherwise, fetch from the URL
                         _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching online");
-                        products = await getUniqueRecordsFromCsv<KonzumCsvRecord>(uniqueRecords[store], o => o.ProductCode);
+                        products = await getUniqueRecordsFromCsv<KonzumCsvRecord>(await FetchTextAsync(uniqueRecords[store]), o => o.ProductCode);
                     }
 
                     // Add the store and products to the result dictionary

@@ -98,6 +98,7 @@ namespace CijeneScraper.Controllers
                     ProductName = p.ChainProduct.Name,
                     Price = p.MPC ?? p.SpecialPrice ?? 0m
                 })
+                .Where(o => o.Price > 0)
                 .ToListAsync();
             return prices;
         }

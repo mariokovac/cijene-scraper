@@ -1,4 +1,5 @@
 ﻿using CijeneScraper.Models;
+using System.Text;
 
 namespace CijeneScraper.Crawler
 {
@@ -38,7 +39,7 @@ namespace CijeneScraper.Crawler
         /// </summary>
         /// <param name="url">The URL to fetch content from.</param>
         /// <returns>The raw text content of the page.</returns>
-        Task<string> FetchTextAsync(string url);
+        Task<string> FetchTextAsync(string url, Encoding? encoding = null);
 
         /// <summary>
         /// Gets the name of the store chain this crawler is associated with.

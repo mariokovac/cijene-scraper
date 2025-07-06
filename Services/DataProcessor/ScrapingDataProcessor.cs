@@ -78,8 +78,8 @@ namespace CijeneScraper.Services.DataProcessor
                 await transaction.CommitAsync(token);
 
                 _logger.LogInformation("├───────────────────────────────────────────────────────────────");
-                _logger.LogInformation("│ ✅\tDB update completed for chain: {ChainName} on date: {Date:yyyy-MM-dd}.",
-                    crawler.Chain, date);
+                _logger.LogInformation("│ ✅\tDB update completed for chain: {ChainName} on date: {Date:yyyy-MM-dd} (Changes: {ChangesCount}).",
+                    crawler.Chain, date, changesCount);
                 _logger.LogInformation("└───────────────────────────────────────────────────────────────");
             }
             catch

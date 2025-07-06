@@ -83,11 +83,14 @@ namespace CijeneScraper.Crawler
         /// </summary>
         /// <param name="url">The URL to fetch content from.</param>
         /// <returns>The raw text content of the page.</returns>
-        public virtual async Task<string> FetchTextAsync(string url)
+        public virtual async Task<string> FetchTextAsync(string url, Encoding? encoding = null)
         {
             var response = await _http.GetAsync(url);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync();
+            var contentBytes = await response.Content.ReadAsByteArrayAsync();
+
+            var effectiveEncoding = encoding ?? Encoding.UTF8;
+            return effectiveEncoding.GetString(contentBytes);
         }
 
 
@@ -113,38 +116,37 @@ namespace CijeneScraper.Crawler
         }
 
         /// <summary>
-        /// Reads unique records from a CSV file at the given URL, using the specified key selector.
+        /// Reads unique records from a CSV text, using the specified key selector.
         /// Only the last occurrence of each key is kept.
         /// </summary>
         /// <typeparam name="T">The type of record to read from the CSV.</typeparam>
-        /// <param name="url">The URL of the CSV file.</param>
+        /// <param name="csvText">The CSV content as a string.</param>
         /// <param name="keySelector">A function to extract the unique key from each record.</param>
         /// <returns>A list of unique records by key.</returns>
         protected virtual async Task<List<T>> getUniqueRecordsFromCsv<T>(
-            string url,
+            string csvText,
             Func<T, string> keySelector)
         {
             // Calls the overload with default configuration and cancellation token
-            return await getUniqueRecordsFromCsv(url, keySelector, null, default);
+            return await getUniqueRecordsFromCsv(csvText, keySelector, null, default);
         }
 
         /// <summary>
-        /// Reads unique records from a CSV file at the given URL, using the specified key selector and CSV configuration.
+        /// Reads unique records from a CSV text, using the specified key selector and CSV configuration.
         /// Only the last occurrence of each key is kept.
         /// </summary>
         /// <typeparam name="T">The type of record to read from the CSV.</typeparam>
-        /// <param name="url">The URL of the CSV file.</param>
+        /// <param name="csvText">The CSV content as a string.</param>
         /// <param name="keySelector">A function to extract the unique key from each record.</param>
         /// <param name="csvConfig">Optional CSV configuration. If null, uses the default configuration.</param>
         /// <param name="cancellationToken">Token to cancel the operation.</param>
         /// <returns>A list of unique records by key.</returns>
         protected virtual async Task<List<T>> getUniqueRecordsFromCsv<T>(
-            string url,
+            string csvText,
             Func<T, string> keySelector,
             CsvConfiguration csvConfig = null,
             CancellationToken cancellationToken = default)
         {
-            var csvText = await FetchTextAsync(url);
             csvConfig ??= new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 MissingFieldFound = null,

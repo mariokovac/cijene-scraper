@@ -8,6 +8,7 @@ using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace CijeneScraper
 {
@@ -23,6 +24,8 @@ namespace CijeneScraper
         /// <param name="args">Command-line arguments.</param>
         public static void Main(string[] args)
         {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
             var builder = WebApplication.CreateBuilder(args);
             var cachingEngine = builder.Configuration["Caching:Engine"]?.ToLowerInvariant() ?? "parquet";
 
