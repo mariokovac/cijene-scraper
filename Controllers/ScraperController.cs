@@ -4,8 +4,12 @@ using CijeneScraper.Models;
 using CijeneScraper.Models.Database;
 using CijeneScraper.Services;
 using CijeneScraper.Services.DataProcessor;
+using CijeneScraper.Services.Notification;
+using CijeneScraper.Utility;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+using System.Net.Mail;
 
 namespace CijeneScraper.Controllers
 {
@@ -17,6 +21,7 @@ namespace CijeneScraper.Controllers
         private readonly ILogger<ScraperController> _logger;
         private readonly Dictionary<string, ICrawler> _crawlers;
         private readonly IScrapingDataProcessor _dataProcessor;
+        private readonly IEmailNotificationService _emailService;
 
         private const string outputFolder = "ScrapedData";
 
@@ -32,13 +37,15 @@ namespace CijeneScraper.Controllers
             ILogger<ScraperController> logger,
             IEnumerable<ICrawler> crawlers,
             ApplicationDbContext dbContext,
-            IScrapingDataProcessor dataProcessor
+            IScrapingDataProcessor dataProcessor,
+            IEmailNotificationService emailService
             )
         {
             _queue = queue;
             _logger = logger;
             _crawlers = crawlers.ToDictionary(c => c.Chain, StringComparer.OrdinalIgnoreCase);
             _dataProcessor = dataProcessor;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -53,13 +60,19 @@ namespace CijeneScraper.Controllers
         [HttpPost("start/{chain}")]
         public IActionResult StartScraping(string chain, DateOnly? date = null)
         {
+            if (string.IsNullOrWhiteSpace(chain))
+            {
+                _logger.LogError("Chain name cannot be null or empty.");
+                return BadRequest("Chain name cannot be null or empty.");
+            }
+            date ??= DateOnly.FromDateTime(DateTime.UtcNow);
+
             if (!_crawlers.TryGetValue(chain, out var crawler))
             {
                 _logger.LogError("Unknown chain: {chain}", chain);
                 return BadRequest($"Unknown chain: {chain}");
             }
 
-            date ??= DateOnly.FromDateTime(DateTime.UtcNow);
             _logger.LogInformation($"Received scraping request for chain: {chain} on date: {date:yyyy-MM-dd}", chain, date);
 
             bool wasRunning = _queue.IsRunning;
@@ -72,6 +85,7 @@ namespace CijeneScraper.Controllers
             {
                 try
                 {
+                    var timer = Stopwatch.StartNew();
                     _logger.LogInformation($"Starting scraping job for chain {chain} on date {date:yyyy-MM-dd}");
 
                     var results = await crawler.CrawlAsync(outputFolder, date.Value, token);
@@ -88,6 +102,22 @@ namespace CijeneScraper.Controllers
 
                     results = null; // Clear results to free memory
                     _logger.LogInformation($"Scraping job for chain {chain} completed successfully.", crawler.Chain);
+
+                    // Send email notification
+                    try
+                    {
+                        timer.Stop();
+                        await _emailService.SendAsync(
+                            $"Scraping completed for [{chain} - {date:yyyy-MM-dd}]",
+                            $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r " +
+                            $"Time taken {timer.Elapsed.ToString("hh\\:mm\\:ss\\.fff")}"
+                        );
+                        _logger.LogInformation($"Email notification sent for scraping completion of chain {chain}.");
+                    }
+                    catch (SmtpException smtpEx)
+                    {
+                        _logger.LogError(smtpEx, "Failed to send email notification for scraping completion.");
+                    }
                 }
                 catch (OperationCanceledException)
                 {

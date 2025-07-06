@@ -1,12 +1,14 @@
 using CijeneScraper.Crawler;
 using CijeneScraper.Data;
 using CijeneScraper.Data.Repository;
+using CijeneScraper.Models;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Caching;
 using CijeneScraper.Services.Caching.CSV;
 using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
+using CijeneScraper.Services.Notification;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 
@@ -39,6 +41,10 @@ namespace CijeneScraper
 
             // Register application services and dependencies
             builder.Services.AddControllers();
+
+            builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
+            builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+
             builder.Services.AddSingleton<ScrapingQueue>();
             builder.Services.AddHostedService<ScrapingWorker>();
             builder.Services.AddSingleton<HttpClient>();

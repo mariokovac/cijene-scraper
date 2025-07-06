@@ -29,3 +29,5 @@ README.md
 !.git/packed-refs
 !.git/refs/heads/**
 ScrapedData
+appsettings.Development.json
+appsettings.Local.json

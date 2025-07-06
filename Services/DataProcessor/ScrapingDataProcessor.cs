@@ -48,7 +48,7 @@ namespace CijeneScraper.Services.DataProcessor
             using var transaction = await dbContext.Database.BeginTransactionAsync(token);
             try
             {
-                using var timer = new TimedOperation(_logger, "DB update");
+                var sw = Stopwatch.StartNew();
 
                 _logger.LogInformation("┌───────────────────────────────────────────────────────────────");
                 _logger.LogInformation("│ ▶️\tStarting DB update for chain: {ChainName} on date: {Date:yyyy-MM-dd}", crawler.Chain, date);
