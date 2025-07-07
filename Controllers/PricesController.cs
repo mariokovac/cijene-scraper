@@ -147,5 +147,77 @@ namespace CijeneScraper.Controllers
             // Return all locations with the lowest price
             return prices.Where(p => p.Price == lowestPrice).ToList();
         }
+
+        /// <summary>
+        /// Retrieves prices for the specified product names grouped by chain and product name for today's date,
+        /// limiting the results to 5 stores per product unless a city is specified.
+        /// </summary>
+        /// <param name="productNames">List of product names (required).</param>
+        /// <param name="city">Optional city name to filter results.</param>
+        /// <returns>A dictionary where the key is the chain name, and the value is another dictionary with product names as keys and lists of prices as values.</returns>
+        [HttpGet("ByProductNamesGrouped")]
+        public async Task<ActionResult<Dictionary<string, Dictionary<string, List<PriceViewModel>>>>> GetPricesByProductNamesGrouped(
+            [FromQuery] List<string> productNames,
+            [FromQuery] string? city = null)
+        {
+            // Validate the productNames parameter
+            if (productNames == null || productNames.Count == 0)
+            {
+                return BadRequest("ProductNames parameter is required.");
+            }
+        
+            // Get today's date
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        
+            // Convert product names to lowercase for case-insensitive comparison
+            var lowerCaseProductNames = productNames.Select(name => name.ToLower()).ToList();
+        
+            // Query prices for the specified product names on today's date
+            var pricesQuery = _context.Prices
+                .Include(p => p.ChainProduct)
+                .Include(p => p.Store)
+                .Where(p => lowerCaseProductNames.Any(name => p.ChainProduct.Name.ToLower().Contains(name)) && p.Date == today);
+        
+            // Apply city filter if provided
+            if (!string.IsNullOrEmpty(city))
+            {
+                pricesQuery = pricesQuery.Where(p => p.Store.City.ToLower() == city.ToLower());
+            }
+        
+            var prices = await pricesQuery
+                .Select(p => new
+                {
+                    ChainName = p.ChainProduct.Chain.Name,
+                    ProductName = p.ChainProduct.Name,
+                    PriceViewModel = new PriceViewModel
+                    {
+                        Date = p.Date,
+                        ChainName = p.ChainProduct.Chain.Name,
+                        StoreName = p.Store.Address + ", " + p.Store.PostalCode + " " + p.Store.City,
+                        ProductName = p.ChainProduct.Name,
+                        Amount = p.MPC ?? p.SpecialPrice ?? 0m
+                    }
+                })
+                .Where(p => p.PriceViewModel.Amount > 0) // Filter prices with Amount > 0
+                .OrderBy(p => p.PriceViewModel.Amount) // Sort by Amount in ascending order
+                .ToListAsync();
+        
+            // Group prices by ChainName and then by ProductName
+            var groupedPrices = prices
+                .GroupBy(p => p.ChainName)
+                .ToDictionary(
+                    chainGroup => chainGroup.Key,
+                    chainGroup => chainGroup
+                        .GroupBy(p => p.ProductName)
+                        .ToDictionary(
+                            productGroup => productGroup.Key,
+                            productGroup => string.IsNullOrEmpty(city)
+                                ? productGroup.Take(5).Select(p => p.PriceViewModel).ToList() // Apply limit if city is not provided
+                                : productGroup.Select(p => p.PriceViewModel).ToList() // Ignore limit if city is provided
+                        )
+                );
+        
+            return groupedPrices;
+        }
     }
 }
