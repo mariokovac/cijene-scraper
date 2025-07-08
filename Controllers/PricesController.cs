@@ -157,6 +157,7 @@ namespace CijeneScraper.Controllers
         /// <returns>A dictionary where the key is the chain name, and the value is another dictionary with product names as keys and lists of prices as values.</returns>
         [HttpGet("ByProductNamesGrouped")]
         public async Task<ActionResult<Dictionary<string, Dictionary<string, List<PriceViewModel>>>>> GetPricesByProductNamesGrouped(
+            CancellationToken cancellationToken,
             [FromQuery] List<string> productNames,
             [FromQuery] string? city = null)
         {
@@ -171,11 +172,14 @@ namespace CijeneScraper.Controllers
         
             // Convert product names to lowercase for case-insensitive comparison
             var lowerCaseProductNames = productNames.Select(name => name.ToLower()).ToList();
-        
+
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadUncommitted);
+
             // Query prices for the specified product names on today's date
             var pricesQuery = _context.Prices
                 .Include(p => p.ChainProduct)
                 .Include(p => p.Store)
+                .AsNoTracking()
                 .Where(p => lowerCaseProductNames.Any(name => p.ChainProduct.Name.ToLower().Contains(name)) && p.Date == today);
         
             // Apply city filter if provided
@@ -183,8 +187,8 @@ namespace CijeneScraper.Controllers
             {
                 pricesQuery = pricesQuery.Where(p => p.Store.City.ToLower() == city.ToLower());
             }
-        
-            var prices = await pricesQuery
+
+            var q = pricesQuery
                 .Select(p => new
                 {
                     ChainName = p.ChainProduct.Chain.Name,
@@ -199,8 +203,10 @@ namespace CijeneScraper.Controllers
                     }
                 })
                 .Where(p => p.PriceViewModel.Amount > 0) // Filter prices with Amount > 0
-                .OrderBy(p => p.PriceViewModel.Amount) // Sort by Amount in ascending order
-                .ToListAsync();
+                .OrderBy(p => p.PriceViewModel.Amount); // Sort by Amount in ascending order;
+
+            var prices = await q
+                .ToListAsync(cancellationToken);
         
             // Group prices by ChainName and then by ProductName
             var groupedPrices = prices

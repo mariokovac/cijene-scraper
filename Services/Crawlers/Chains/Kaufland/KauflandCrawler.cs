@@ -165,10 +165,15 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
                     }
                     else
                     {
+                        //var utf8 = await FetchTextAsync(uniqueRecords[store]);
+                        //var windows1252 = await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1252"));
+                        //var windows1250 = await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1250"));
+
                         // Otherwise, fetch from the URL
                         _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching online!");
                         products = await getUniqueRecordsFromCsv<KauflandCsvRecord>(
-                            await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1252")),
+                            //await FetchTextAsync(uniqueRecords[store]),
+                            await FetchTextAsync(uniqueRecords[store], [Encoding.GetEncoding("windows-1250"), Encoding.UTF8]),
                             o => o.ProductCode,
                             new CsvConfiguration(CultureInfo.InvariantCulture)
                             {

@@ -36,10 +36,18 @@ namespace CijeneScraper.Crawler
 
         /// <summary>
         /// Asynchronously fetches the raw text content from the specified URL.
+        /// This method ensures the HTTP request is successful and attempts to decode the content using the provided encodings.
+        /// If no encodings are specified, UTF-8 is used by default.
         /// </summary>
         /// <param name="url">The URL to fetch content from.</param>
-        /// <returns>The raw text content of the page.</returns>
-        Task<string> FetchTextAsync(string url, Encoding? encoding = null);
+        /// <param name="encodings">
+        /// An optional array of encodings to attempt when decoding the content.
+        /// If null, the default encoding is UTF-8.
+        /// </param>
+        /// <returns>
+        /// The raw text content of the page, decoded using the most suitable encoding.
+        /// </returns>
+        Task<string> FetchTextAsync(string url, Encoding[]? encodings = null);
 
         /// <summary>
         /// Gets the name of the store chain this crawler is associated with.

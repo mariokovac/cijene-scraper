@@ -13,6 +13,11 @@ using System.Net.Mail;
 
 namespace CijeneScraper.Controllers
 {
+    /// <summary>
+    /// API controller responsible for managing scraping operations.
+    /// This controller handles requests to start scraping jobs for specific store chains,
+    /// processes the scraped data, and manages notifications for job completion or failure.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class ScraperController : ControllerBase
@@ -20,6 +25,7 @@ namespace CijeneScraper.Controllers
         private readonly ScrapingQueue _queue;
         private readonly ILogger<ScraperController> _logger;
         private readonly Dictionary<string, ICrawler> _crawlers;
+        private readonly ApplicationDbContext _dbContext;
         private readonly IScrapingDataProcessor _dataProcessor;
         private readonly IEmailNotificationService _emailService;
 
@@ -44,21 +50,35 @@ namespace CijeneScraper.Controllers
             _queue = queue;
             _logger = logger;
             _crawlers = crawlers.ToDictionary(c => c.Chain, StringComparer.OrdinalIgnoreCase);
+            _dbContext = dbContext;
             _dataProcessor = dataProcessor;
             _emailService = emailService;
         }
 
         /// <summary>
-        /// Starts a scraping job for the specified chain and optional date.
+        /// Handles HTTP POST requests to initiate a scraping job for a specified store chain and date.
+        /// Validates the chain name, retrieves the appropriate crawler, and executes the scraping process.
+        /// The method processes and persists the results, clears related cache, and schedules a database reindex.
+        /// Email notifications are sent on both success and failure, and all major steps are logged.
         /// </summary>
-        /// <param name="chain">The name of the chain to scrape.</param>
-        /// <param name="date">The date for which to scrape data. If null, the current date is used.</param>
+        /// <param name="chain">
+        /// The identifier of the store chain to scrape. Must not be null or empty.
+        /// </param>
+        /// <param name="date">
+        /// The date for which to perform scraping. If not provided, the current UTC date is used.
+        /// </param>
         /// <returns>
-        /// Returns 202 Accepted if the scraping job is added to the queue,
-        /// 400 Bad Request if the chain is unknown.
+        /// - <see cref="OkObjectResult"/> (HTTP 200) if the scraping job completes successfully.
+        /// - <see cref="BadRequestObjectResult"/> (HTTP 400) if the chain name is invalid or unknown.
         /// </returns>
+        /// <remarks>
+        /// Handles cancellation requests and exceptions, ensuring that errors are logged and notifications are sent.
+        /// </remarks>
         [HttpPost("start/{chain}")]
-        public IActionResult StartScraping(string chain, DateOnly? date = null)
+        public async Task<IActionResult> StartScraping(
+            CancellationToken cancellationToken,
+            string chain, 
+            DateOnly? date = null)
         {
             if (string.IsNullOrWhiteSpace(chain))
             {
@@ -75,80 +95,75 @@ namespace CijeneScraper.Controllers
 
             _logger.LogInformation($"Received scraping request for chain: {chain} on date: {date:yyyy-MM-dd}", chain, date);
 
-            bool wasRunning = _queue.IsRunning;
-            if (wasRunning)
+            int changes = 0;
+            try
             {
-                _logger.LogInformation("Previous scraping job was running and will be cancelled.");
-            }
+                var timer = Stopwatch.StartNew();
+                _logger.LogInformation($"Starting scraping job for chain {chain} on date {date:yyyy-MM-dd}");
 
-            _queue.Enqueue(async token =>
-            {
+                var results = await crawler.CrawlAsync(outputFolder, date.Value, cancellationToken);
+
+                // Check if the task was cancelled before processing results
+                cancellationToken.ThrowIfCancellationRequested();
+
+                changes = await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, cancellationToken);
+
+                // Check again if the task was cancelled after processing results
+                cancellationToken.ThrowIfCancellationRequested();
+
+                await crawler.ClearCacheAsync(outputFolder, date.Value, cancellationToken);
+
+                // reindex db => async background task
+                _queue.Enqueue(async token =>
+                {
+                    await _dbContext.Database.ExecuteSqlRawAsync("REINDEX TABLE 'Prices'");
+                });
+
+                results = null; // Clear results to free memory
+                _logger.LogInformation($"Scraping job for chain {chain} completed successfully.", crawler.Chain);
+
+                // Send email notification
                 try
                 {
-                    var timer = Stopwatch.StartNew();
-                    _logger.LogInformation($"Starting scraping job for chain {chain} on date {date:yyyy-MM-dd}");
-
-                    var results = await crawler.CrawlAsync(outputFolder, date.Value, token);
-
-                    // Check if the task was cancelled before processing results
-                    token.ThrowIfCancellationRequested();
-
-                    int changes = await _dataProcessor.ProcessScrapingResultsAsync(crawler, results, date.Value, token);
-
-                    // Check again if the task was cancelled after processing results
-                    token.ThrowIfCancellationRequested();
-
-                    await crawler.ClearCacheAsync(outputFolder, date.Value, token);
-
-                    results = null; // Clear results to free memory
-                    _logger.LogInformation($"Scraping job for chain {chain} completed successfully.", crawler.Chain);
-
-                    // Send email notification
-                    try
-                    {
-                        timer.Stop();
-                        await _emailService.SendAsync(
-                            $"Scraping completed for [{chain} - {date:yyyy-MM-dd}]",
-                            $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
-                            $"Time taken {timer.Elapsed.ToString("hh\\:mm\\:ss\\.fff")}\n\r" +
-                            $"Total changes detected: {changes}\n\r"
-                        );
-                        _logger.LogInformation($"Email notification sent for scraping completion of chain {chain}.");
-                    }
-                    catch (SmtpException smtpEx)
-                    {
-                        _logger.LogError(smtpEx, "Failed to send email notification for scraping completion.");
-                    }
+                    timer.Stop();
+                    await _emailService.SendAsync(
+                        $"Scraping completed for [{chain} - {date:yyyy-MM-dd}]",
+                        $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
+                        $"Time taken {timer.Elapsed.ToString("hh\\:mm\\:ss\\.fff")}\n\r" +
+                        $"Total changes detected: {changes}\n\r"
+                    );
+                    _logger.LogInformation($"Email notification sent for scraping completion of chain {chain}.");
                 }
-                catch (OperationCanceledException)
+                catch (SmtpException smtpEx)
                 {
-                    _logger.LogInformation($"Scraping job for chain {chain} was cancelled.");
-                    throw; // Re-throw to let the queue handle it
+                    _logger.LogError(smtpEx, "Failed to send email notification for scraping completion.");
                 }
-                catch (Exception ex)
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation($"Scraping job for chain {chain} was cancelled.");
+                throw; // Re-throw to let the queue handle it
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error occurred during scraping for chain {chain}");
+                try
                 {
-                    _logger.LogError(ex, $"Error occurred during scraping for chain {chain}");
-                    try
-                    {
-                        await _emailService.SendAsync(
-                            $"Scraping failed for [{chain} - {date:yyyy-MM-dd}]",
-                            $"An error occurred during the scraping job for chain '{chain}' on date {date:yyyy-MM-dd}.\n\r" +
-                            $"Error: {ex.Message}\n\rStack Trace: {ex.StackTrace}"
-                        );
-                        _logger.LogInformation($"Email notification sent for scraping failure of chain {chain}.");
-                    }
-                    catch (SmtpException smtpEx)
-                    {
-                        _logger.LogError(smtpEx, "Failed to send email notification for scraping failure.");
-                    }
-                    throw; // Re-throw to let the queue handle it
+                    await _emailService.SendAsync(
+                        $"Scraping failed for [{chain} - {date:yyyy-MM-dd}]",
+                        $"An error occurred during the scraping job for chain '{chain}' on date {date:yyyy-MM-dd}.\n\r" +
+                        $"Error: {ex.Message}\n\rStack Trace: {ex.StackTrace}"
+                    );
+                    _logger.LogInformation($"Email notification sent for scraping failure of chain {chain}.");
                 }
-            });
+                catch (SmtpException smtpEx)
+                {
+                    _logger.LogError(smtpEx, "Failed to send email notification for scraping failure.");
+                }
+                throw; // Re-throw to let the queue handle it
+            }
 
-            if (wasRunning)
-                return Accepted($"Previous scraping job was cancelled. New scraping job for chain '{chain}' started for date {date:yyyy-MM-dd}.");
-            else
-                return Accepted($"Scraping job for chain '{chain}' added to the queue for date {date:yyyy-MM-dd}.");
+            return Ok($"Scraping job for chain '{chain}' completed for date {date:yyyy-MM-dd}. Total changes: {changes}");
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using CijeneScraper.Controllers;
 using CijeneScraper.Models;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Utility;
 using CsvHelper;
 using CsvHelper.Configuration;
 using System;
@@ -78,19 +79,16 @@ namespace CijeneScraper.Crawler
             DateOnly date,
             CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// Asynchronously fetches the raw text content from the specified URL.
-        /// </summary>
-        /// <param name="url">The URL to fetch content from.</param>
-        /// <returns>The raw text content of the page.</returns>
-        public virtual async Task<string> FetchTextAsync(string url, Encoding? encoding = null)
+        /// <inheritdoc/>
+        public virtual async Task<string> FetchTextAsync(string url, Encoding[]? encodings = null)
         {
             var response = await _http.GetAsync(url);
             response.EnsureSuccessStatusCode();
+
+            encodings ??= new[] { Encoding.UTF8 };
             var contentBytes = await response.Content.ReadAsByteArrayAsync();
 
-            var effectiveEncoding = encoding ?? Encoding.UTF8;
-            return effectiveEncoding.GetString(contentBytes);
+            return EncodingDetector.GetText(contentBytes, encodings);
         }
 
 
