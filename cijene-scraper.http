@@ -8,6 +8,10 @@ POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland
 Accept: application/json
 ###
 
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/*
+Accept: application/json
+###
+
 GET {{cijene_scraper_HostAddress}}/api/prices?dates=2025-07-04
 Accept: application/json
 ###

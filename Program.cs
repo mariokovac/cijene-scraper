@@ -9,6 +9,7 @@ using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
 using CijeneScraper.Services.Notification;
+using CijeneScraper.Services.Scrape;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 
@@ -44,6 +45,7 @@ namespace CijeneScraper
 
             builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
             builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+            builder.Services.AddScoped<IScrapingJobService, ScrapingJobService>();
 
             builder.Services.AddSingleton<ScrapingQueue>();
             builder.Services.AddHostedService<ScrapingWorker>();
