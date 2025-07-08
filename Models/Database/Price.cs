@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Xml.Linq;
 
 namespace CijeneScraper.Models.Database
 {
@@ -11,16 +10,6 @@ namespace CijeneScraper.Models.Database
     // Index to speed up queries filtering by date
     [Index(nameof(Date), Name = "IX_Prices_Date")]
 
-    // Indexes to speed up queries filtering by chain product and store
-    [Index(nameof(ChainProductId), Name = "IX_Prices_ChainProductId")]
-
-    [Index(nameof(StoreId), Name = "IX_Prices_StoreId")]
-
-    // Composite index to speed up queries filtering by date, chain product, and store
-    [Index(
-        nameof(Date), nameof(ChainProductId), nameof(StoreId),
-        Name = "IX_Prices_Date_ChainProduct_Store"
-    )]
     // Unique index to ensure no duplicate prices for the same product in the same store on the same date
     [Index(
         nameof(ChainProductId), nameof(StoreId), nameof(Date),

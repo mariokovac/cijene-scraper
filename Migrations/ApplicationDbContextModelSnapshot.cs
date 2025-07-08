@@ -71,6 +71,9 @@ namespace CijeneScraper.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Quantity")
                         .HasColumnType("text");
 
@@ -80,6 +83,8 @@ namespace CijeneScraper.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ChainId");
+
+                    b.HasIndex("ProductId");
 
                     b.HasIndex(new[] { "Barcode" }, "IX_ChainProducts_Barcode");
 
@@ -123,18 +128,80 @@ namespace CijeneScraper.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex(new[] { "ChainProductId" }, "IX_Prices_ChainProductId");
+                    b.HasIndex("StoreId");
 
                     b.HasIndex(new[] { "Date" }, "IX_Prices_Date");
-
-                    b.HasIndex(new[] { "Date", "ChainProductId", "StoreId" }, "IX_Prices_Date_ChainProduct_Store");
-
-                    b.HasIndex(new[] { "StoreId" }, "IX_Prices_StoreId");
 
                     b.HasIndex(new[] { "ChainProductId", "StoreId", "Date" }, "UX_Prices_Product_Store_Date")
                         .IsUnique();
 
                     b.ToTable("Prices");
+                });
+
+            modelBuilder.Entity("CijeneScraper.Models.Database.Product", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Quantity")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("UOM")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("CijeneScraper.Models.Database.ScrapingJob", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ChainID")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChainID", "Date")
+                        .IsUnique();
+
+                    b.ToTable("ScrapingJobs");
                 });
 
             modelBuilder.Entity("CijeneScraper.Models.Database.Store", b =>
@@ -179,7 +246,15 @@ namespace CijeneScraper.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CijeneScraper.Models.Database.Product", "Product")
+                        .WithMany("ChainProducts")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Chain");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("CijeneScraper.Models.Database.Price", b =>
@@ -201,6 +276,17 @@ namespace CijeneScraper.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("CijeneScraper.Models.Database.ScrapingJob", b =>
+                {
+                    b.HasOne("CijeneScraper.Models.Database.Chain", "Chain")
+                        .WithMany()
+                        .HasForeignKey("ChainID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chain");
+                });
+
             modelBuilder.Entity("CijeneScraper.Models.Database.Store", b =>
                 {
                     b.HasOne("CijeneScraper.Models.Database.Chain", "Chain")
@@ -220,6 +306,11 @@ namespace CijeneScraper.Migrations
             modelBuilder.Entity("CijeneScraper.Models.Database.ChainProduct", b =>
                 {
                     b.Navigation("Prices");
+                });
+
+            modelBuilder.Entity("CijeneScraper.Models.Database.Product", b =>
+                {
+                    b.Navigation("ChainProducts");
                 });
 #pragma warning restore 612, 618
         }

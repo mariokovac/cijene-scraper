@@ -189,25 +189,64 @@ namespace CijeneScraper.Services.DataProcessor
 
         /// <summary>
         /// Processes and updates product information for a chain, adding new products as needed.
+        /// Ensures that a global Product exists for each unique product code/barcode, and links ChainProduct to Product.
         /// </summary>
         /// <param name="dbContext">The database context.</param>
         /// <param name="chain">The chain entity.</param>
         /// <param name="priceInfos">A collection of price information containing product data.</param>
         /// <param name="token">A cancellation token.</param>
-        private async Task ProcessProductsAsync(ApplicationDbContext dbContext, Chain chain, IEnumerable<PriceInfo> priceInfos, CancellationToken token)
+        private async Task ProcessProductsAsync(
+            ApplicationDbContext dbContext, 
+            Chain chain, 
+            IEnumerable<PriceInfo> priceInfos, 
+            CancellationToken token)
         {
             var productCodes = priceInfos.Select(p => p.ProductCode).ToHashSet();
 
+            // 1. Load existing global products by code or barcode
+            var existingProducts = await dbContext.Products
+                .Where(p => p.Barcode != null)
+                .ToDictionaryAsync(p => p.Barcode!, token);
+
+            // 2. Prepare new global products
+            var newProducts = new List<Product>();
+            foreach (var group in priceInfos.GroupBy(p => p.Barcode))
+            {
+                var barcode = group.Key;
+                var first = group.First();
+
+                if (!existingProducts.ContainsKey(barcode))
+                {
+                    var product = new Product
+                    {
+                        Barcode = barcode,
+                        Name = StringHelpers.TrimToMaxLength(first.Name, 300),
+                        Brand = first.Brand,
+                        UOM = first.UOM,
+                        Quantity = first.Quantity,
+                        Category = null // TODO: Handle category
+                    };
+                    newProducts.Add(product);
+                    existingProducts[barcode] = product;
+                }
+            }
+
+            if (newProducts.Any())
+            {
+                dbContext.Products.AddRange(newProducts);
+                await dbContext.SaveChangesAsync(token);
+            }
+
+            // 3. Load existing chain products
             var existingChainProducts = await dbContext.ChainProducts
                 .Where(cp => cp.ChainId == chain.Id && productCodes.Contains(cp.Code))
                 .ToDictionaryAsync(cp => cp.Code, token);
 
             var newChainProducts = new List<ChainProduct>();
-
-            foreach (var priceInfo in priceInfos.GroupBy(p => p.ProductCode))
+            foreach (var group in priceInfos.GroupBy(p => p.ProductCode))
             {
-                var productCode = priceInfo.Key;
-                var firstPrice = priceInfo.First();
+                var productCode = group.Key;
+                var first = group.First();
 
                 if (!existingChainProducts.ContainsKey(productCode))
                 {
@@ -215,14 +254,26 @@ namespace CijeneScraper.Services.DataProcessor
                     {
                         Chain = chain,
                         Code = productCode,
-                        Name = firstPrice.Name,
-                        Barcode = firstPrice.Barcode,
-                        Brand = firstPrice.Brand,
-                        UOM = firstPrice.UOM,
-                        Quantity = firstPrice.Quantity
+                        Name = first.Name,
+                        Barcode = first.Barcode,
+                        Brand = first.Brand,
+                        UOM = first.UOM,
+                        Quantity = first.Quantity,
+                        ProductId = existingProducts[first.Barcode].Id // Poveži na Product
                     };
                     newChainProducts.Add(chainProduct);
                     existingChainProducts[productCode] = chainProduct;
+                }
+                else
+                {
+                    // Update existing chain product and ensure ProductId is set
+                    var cp = existingChainProducts[productCode];
+                    cp.Name = first.Name;
+                    cp.Barcode = first.Barcode;
+                    cp.Brand = first.Brand;
+                    cp.UOM = first.UOM;
+                    cp.Quantity = first.Quantity;
+                    cp.ProductId = existingProducts[first.Barcode].Id;
                 }
             }
 

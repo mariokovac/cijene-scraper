@@ -1,5 +1,6 @@
 using CijeneScraper.Crawler;
 using CijeneScraper.Data;
+using CijeneScraper.Models.Database;
 using CijeneScraper.Services.DataProcessor;
 using CijeneScraper.Services.Notification;
 using Microsoft.EntityFrameworkCore;
@@ -35,10 +36,32 @@ namespace CijeneScraper.Services.Scrape
             _logger = logger;
         }
 
-        public async Task<ScrapingJobResult> RunScrapingJobAsync(string chain, DateOnly date, CancellationToken cancellationToken)
+        public async Task<ScrapingJobResult> RunScrapingJobAsync(
+            string chain, 
+            DateOnly date, 
+            CancellationToken cancellationToken, 
+            bool force = false)
         {
             if (string.IsNullOrWhiteSpace(chain))
                 return new ScrapingJobResult { Success = false, ErrorMessage = "Chain name cannot be null or empty." };
+
+            Chain dbChain = null;
+
+            // Check if job already done
+            if (!force)
+            {
+                // find out chain id
+                dbChain = await _dbContext.Chains.FirstOrDefaultAsync(c => c.Name == chain, cancellationToken);
+
+                // if chain is not found it may not be registered yet, continue with scraping
+                if (dbChain != null)
+                {
+                    bool alreadyDone = await _dbContext.ScrapingJobs
+                        .AnyAsync(j => j.ChainID == dbChain.Id && j.Date == date, cancellationToken);
+                    if (alreadyDone)
+                        return new ScrapingJobResult { Success = false, ErrorMessage = $"Scraping already completed for {chain} on {date:yyyy-MM-dd}." };
+                }
+            }
 
             ICrawler[] crawlers;
             if (chain == "*")
@@ -52,7 +75,7 @@ namespace CijeneScraper.Services.Scrape
             foreach (var c in crawlers)
             {
                 if (c == null)
-                    return new ScrapingJobResult { Success = false, ErrorMessage = $"Crawler for chain '{chain}' is not registered." };
+                    return new ScrapingJobResult { Success = false, ErrorMessage = $"Crawler for chain 'NULL' is not registered." };
 
                 if (cancellationToken.IsCancellationRequested)
                     return new ScrapingJobResult { Success = false, ErrorMessage = "Scraping request was cancelled." };
@@ -67,6 +90,12 @@ namespace CijeneScraper.Services.Scrape
                     changes = await _dataProcessor.ProcessScrapingResultsAsync(c, results, date, cancellationToken);
                     totalChanges += changes;
 
+                    // load chain from database if not already done
+                    if (dbChain == null)
+                    {
+                        dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
+                    }
+
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
 
@@ -79,8 +108,8 @@ namespace CijeneScraper.Services.Scrape
                     {
                         timer.Stop();
                         await _emailService.SendAsync(
-                            $"Scraping completed for [{chain} - {date:yyyy-MM-dd}]",
-                            $"The scraping job for chain '{chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
+                            $"Scraping completed for [{c.Chain} - {date:yyyy-MM-dd}]",
+                            $"The scraping job for chain '{c.Chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
                             $"Time taken {timer.Elapsed:hh\\:mm\\:ss\\.fff}\n\r" +
                             $"Total changes detected: {changes}\n\r"
                         );
@@ -92,17 +121,17 @@ namespace CijeneScraper.Services.Scrape
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation($"Scraping job for chain {chain} was cancelled.");
+                    _logger.LogInformation($"Scraping job for chain {c.Chain} was cancelled.");
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error occurred during scraping for chain {chain}");
+                    _logger.LogError(ex, $"Error occurred during scraping for chain {c.Chain}");
                     try
                     {
                         await _emailService.SendAsync(
-                            $"Scraping failed for [{chain} - {date:yyyy-MM-dd}]",
-                            $"An error occurred during the scraping job for chain '{chain}' on date {date:yyyy-MM-dd}.\n\r" +
+                            $"Scraping failed for [{c.Chain} - {date:yyyy-MM-dd}]",
+                            $"An error occurred during the scraping job for chain '{c.Chain}' on date {date:yyyy-MM-dd}.\n\r" +
                             $"Error: {ex.Message}\n\rStack Trace: {ex.StackTrace}"
                         );
                     }
@@ -113,6 +142,15 @@ namespace CijeneScraper.Services.Scrape
                     throw;
                 }
             }
+
+            // After successful completion, log the job
+            _dbContext.ScrapingJobs.Add(new ScrapingJob
+            {
+                Chain = dbChain,
+                Date = date,
+                CompletedAt = DateTime.UtcNow
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
             return new ScrapingJobResult
             {

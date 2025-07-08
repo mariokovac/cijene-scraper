@@ -9,6 +9,6 @@ namespace CijeneScraper.Services.Scrape
 
     public interface IScrapingJobService
     {
-        Task<ScrapingJobResult> RunScrapingJobAsync(string chain, DateOnly date, CancellationToken cancellationToken);
+        Task<ScrapingJobResult> RunScrapingJobAsync(string chain, DateOnly date, CancellationToken cancellationToken, bool force = false);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using CijeneScraper.Models;
+using CijeneScraper.Utility;
 using CsvHelper.Configuration.Attributes;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -55,9 +56,9 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             return new PriceInfo
             {
                 ProductCode = p.ProductCode,
-                Barcode = p.Barcode,
+                Barcode = p.Barcode.NormalizeBarcode(p.ProductCode),
                 Name = p.Product,
-                Price = decimal.TryParse(p.Price, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : 0m,
+                Price = decimal.TryParse(p.Price, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : (decimal?)null,
                 Brand = p.Brand,
                 UOM = p.Unit,
                 Quantity = _uomCleanupRegex.Replace(p.Quantity, "").Trim(),

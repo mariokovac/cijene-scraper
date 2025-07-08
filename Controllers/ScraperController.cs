@@ -45,6 +45,9 @@ namespace CijeneScraper.Controllers
         /// <param name="date">
         /// The date for which to perform scraping. If not provided, the current UTC date is used.
         /// </param>
+        /// <param name="force">
+        /// A flag indicating whether to force the scraping operation, bypassing certain checks.
+        /// </param>
         /// <returns>
         /// - <see cref="OkObjectResult"/> (HTTP 200) if the scraping job(s) complete successfully.
         /// - <see cref="BadRequestObjectResult"/> (HTTP 400) if the chain name is invalid, unknown, or the request is cancelled.
@@ -70,11 +73,12 @@ namespace CijeneScraper.Controllers
         public async Task<IActionResult> StartScraping(
             CancellationToken cancellationToken,
             string chain, 
-            DateOnly? date = null)
+            DateOnly? date = null,
+            [FromQuery] bool force = false)
         {
             date ??= DateOnly.FromDateTime(DateTime.UtcNow);
 
-            var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, cancellationToken);
+            var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, cancellationToken, force);
 
             if (!result.Success)
                 return BadRequest(result.ErrorMessage);

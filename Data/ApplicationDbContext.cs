@@ -11,8 +11,10 @@ namespace CijeneScraper.Data
         }
 
         public DbSet<Chain> Chains { get; set; }
+        public DbSet<Product> Products { get; set; }
         public DbSet<ChainProduct> ChainProducts { get; set; }
         public DbSet<Store> Stores { get; set; }
         public DbSet<Price> Prices { get; set; }
+        public DbSet<ScrapingJob> ScrapingJobs { get; set; }
     }
 }

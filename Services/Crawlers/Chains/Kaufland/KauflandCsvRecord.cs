@@ -1,4 +1,5 @@
 ﻿using CijeneScraper.Models;
+using CijeneScraper.Utility;
 using CsvHelper.Configuration.Attributes;
 using System.Globalization;
 
@@ -80,9 +81,9 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
             return new PriceInfo
             {
                 ProductCode = p.ProductCode,
-                Barcode = p.Barcode,
+                Barcode = p.Barcode.NormalizeBarcode(p.ProductCode),
                 Name = p.Product,
-                Price = decimal.TryParse(p.Price, NumberStyles.Any, NumberFormatInfo, out var price) ? price : 0m,
+                Price = decimal.TryParse(p.Price, NumberStyles.Any, NumberFormatInfo, out var price) ? price : (decimal?)null,
                 Brand = p.Brand,
                 UOM = p.UOM,
                 Quantity = p.Quantity?.Trim(),

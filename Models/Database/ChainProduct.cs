@@ -15,6 +15,8 @@ namespace CijeneScraper.Models.Database
 
         public int ChainId { get; set; }
 
+        public long ProductId { get; set; }
+
         [Required]
         public string Code { get; set; } = null!;
 
@@ -33,6 +35,9 @@ namespace CijeneScraper.Models.Database
 
         [ForeignKey("ChainId")]
         public Chain Chain { get; set; } = null!;
+
+        [ForeignKey(nameof(ProductId))]
+        public virtual Product Product { get; set; } = null!;
 
         [InverseProperty("ChainProduct")]
         public virtual ICollection<Price> Prices { get; set; } = new List<Price>();
