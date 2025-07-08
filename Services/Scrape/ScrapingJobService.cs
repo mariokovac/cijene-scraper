@@ -45,24 +45,6 @@ namespace CijeneScraper.Services.Scrape
             if (string.IsNullOrWhiteSpace(chain))
                 return new ScrapingJobResult { Success = false, ErrorMessage = "Chain name cannot be null or empty." };
 
-            Chain dbChain = null;
-
-            // Check if job already done
-            if (!force)
-            {
-                // find out chain id
-                dbChain = await _dbContext.Chains.FirstOrDefaultAsync(c => c.Name == chain, cancellationToken);
-
-                // if chain is not found it may not be registered yet, continue with scraping
-                if (dbChain != null)
-                {
-                    bool alreadyDone = await _dbContext.ScrapingJobs
-                        .AnyAsync(j => j.ChainID == dbChain.Id && j.Date == date, cancellationToken);
-                    if (alreadyDone)
-                        return new ScrapingJobResult { Success = false, ErrorMessage = $"Scraping already completed for {chain} on {date:yyyy-MM-dd}." };
-                }
-            }
-
             ICrawler[] crawlers;
             if (chain == "*")
                 crawlers = _crawlers.Values.ToArray();
@@ -80,6 +62,24 @@ namespace CijeneScraper.Services.Scrape
                 if (cancellationToken.IsCancellationRequested)
                     return new ScrapingJobResult { Success = false, ErrorMessage = "Scraping request was cancelled." };
 
+                Chain dbChain = null;
+
+                // Check if job already done
+                if (!force)
+                {
+                    // find out chain id
+                    dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
+
+                    // if chain is not found it may not be registered yet, continue with scraping
+                    if (dbChain != null)
+                    {
+                        bool alreadyDone = await _dbContext.ScrapingJobs
+                            .AnyAsync(j => j.ChainID == dbChain.Id && j.Date == date, cancellationToken);
+                        if (alreadyDone)
+                            return new ScrapingJobResult { Success = false, ErrorMessage = $"Scraping already completed for {chain} on {date:yyyy-MM-dd}." };
+                    }
+                }
+
                 int changes = 0;
                 try
                 {
@@ -95,6 +95,15 @@ namespace CijeneScraper.Services.Scrape
                     {
                         dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
                     }
+
+                    // After successful completion, log the job
+                    _dbContext.ScrapingJobs.Add(new ScrapingJob
+                    {
+                        Chain = dbChain,
+                        Date = date,
+                        CompletedAt = DateTime.UtcNow
+                    });
+                    await _dbContext.SaveChangesAsync(cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
@@ -142,15 +151,6 @@ namespace CijeneScraper.Services.Scrape
                     throw;
                 }
             }
-
-            // After successful completion, log the job
-            _dbContext.ScrapingJobs.Add(new ScrapingJob
-            {
-                Chain = dbChain,
-                Date = date,
-                CompletedAt = DateTime.UtcNow
-            });
-            await _dbContext.SaveChangesAsync(cancellationToken);
 
             return new ScrapingJobResult
             {
