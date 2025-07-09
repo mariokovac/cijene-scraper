@@ -1,4 +1,5 @@
-﻿using CijeneScraper.Services;
+﻿using CijeneScraper.Data;
+using CijeneScraper.Services;
 using CijeneScraper.Services.Scrape;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,22 +15,24 @@ namespace CijeneScraper.Controllers
     public class ScraperController : ControllerBase
     {
         private readonly ILogger<ScraperController> _logger;
+        private readonly ApplicationDbContext _dbContext;
         private readonly IScrapingJobService _scrapingJobService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScraperController"/> class.
         /// </summary>
-        /// <param name="queue">The scraping queue for managing scraping tasks.</param>
+        /// <param name="queue">The scraping queue for managing and processing scraping tasks.</param>
         /// <param name="logger">The logger instance for logging information and errors.</param>
-        /// <param name="crawlers">A collection of available crawlers, mapped by chain name.</param>
-        /// <param name="dbContext"> The database context for accessing application data.</param>
-        /// <param name="dataProcessor"> The data processor for handling scraping results.</param>
+        /// <param name="dbContext">The database context for accessing application data.</param>
+        /// <param name="scrapingJobService">The service responsible for executing and managing scraping jobs.</param>
         public ScraperController(ScrapingQueue queue,
             ILogger<ScraperController> logger,
+            ApplicationDbContext dbContext,
             IScrapingJobService scrapingJobService
             )
         {
             _logger = logger;
+            _dbContext = dbContext;
             _scrapingJobService = scrapingJobService;
         }
 
@@ -84,6 +87,35 @@ namespace CijeneScraper.Controllers
                 return BadRequest(result.ErrorMessage);
 
             return Ok(result.Message);
+        }
+
+        /// <summary>
+        /// Retrieves the status of recent scraping jobs.
+        /// </summary>
+        /// <returns>
+        /// - <see cref="OkObjectResult"/> (HTTP 200) containing the 10 most recent scraping jobs,
+        ///   ordered by date in descending order.
+        /// </returns>
+        /// <remarks>
+        /// This endpoint returns limited information about each job:
+        /// <list type="bullet">
+        ///   <item>The store chain that was scraped</item>
+        ///   <item>The date for which the scraping was performed</item>
+        ///   <item>The timestamp when the scraping job was completed</item>
+        /// </list>
+        /// The results are limited to the 10 most recent jobs to prevent excessive data transfer.
+        /// </remarks>
+        [HttpGet("status")]
+        public async Task<IActionResult> GetStatus()
+        {
+            var results = _dbContext.ScrapingJobs.Select(o => new
+            {
+                o.Chain,
+                o.Date,
+                o.CompletedAt
+            }).OrderByDescending(o => o.Date)
+            .Take(10);
+            return Ok(results);
         }
     }
 }
