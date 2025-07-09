@@ -10,6 +10,7 @@ using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
 using CijeneScraper.Services.Notification;
 using CijeneScraper.Services.Scrape;
+using CijeneScraper.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 
@@ -31,6 +32,8 @@ namespace CijeneScraper
 
             var builder = WebApplication.CreateBuilder(args);
             var cachingEngine = builder.Configuration["Caching:Engine"]?.ToLowerInvariant() ?? "parquet";
+
+            builder.Services.AddApiKeyAuthentication(builder.Configuration);
 
             // Add EF Core DbContext
             builder.Services.AddDbContext<ApplicationDbContext>(options =>

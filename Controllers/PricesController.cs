@@ -1,8 +1,8 @@
-﻿using CijeneScraper.Models.Database;
-using CijeneScraper.Data;
+﻿using CijeneScraper.Data;
+using CijeneScraper.Models.ViewModel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using CijeneScraper.Models.ViewModel;
 
 namespace CijeneScraper.Controllers
 {
@@ -10,6 +10,7 @@ namespace CijeneScraper.Controllers
     /// Controller for handling price-related API endpoints.
     /// </summary>
     [Route("api/[controller]")]
+    [Authorize]
     [ApiController]
     public class PricesController : ControllerBase
     {
