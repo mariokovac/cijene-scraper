@@ -161,14 +161,11 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
                         // If file already exists, read from it
                         _logger.LogInformation($"Using cached data for store {store.StoreId} from {filePath}");
                         products = await readStorePricesCsv(filePath);
+                        transformToResult(result, store, products);
                         continue;
                     }
                     else
                     {
-                        //var utf8 = await FetchTextAsync(uniqueRecords[store]);
-                        //var windows1252 = await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1252"));
-                        //var windows1250 = await FetchTextAsync(uniqueRecords[store], Encoding.GetEncoding("windows-1250"));
-
                         // Otherwise, fetch from the URL
                         _logger.LogInformation($"Cache miss for store {store.StoreId}, fetching online!");
                         products = await getUniqueRecordsFromCsv<KauflandCsvRecord>(
@@ -339,7 +336,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Kaufland
             // 7) Street name and house number are all segments between the category and the city
             var streetSegments = parts
                 .Skip(1)               // skip the storeType
-                .Take(idxDate - 2)     // up to just before the city segment
+                .Take(idxDate - 3)     // up to just before the city segment
                 .ToArray();
             if (streetSegments.Length < 1)
                 throw new FormatException("Insufficient segments for street name and number.");

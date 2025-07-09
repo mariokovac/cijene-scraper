@@ -76,7 +76,8 @@ namespace CijeneScraper.Services.Scrape
                         bool alreadyDone = await _dbContext.ScrapingJobs
                             .AnyAsync(j => j.ChainID == dbChain.Id && j.Date == date, cancellationToken);
                         if (alreadyDone)
-                            return new ScrapingJobResult { Success = false, ErrorMessage = $"Scraping already completed for {chain} on {date:yyyy-MM-dd}." };
+                            continue;
+                            //return new ScrapingJobResult { Success = false, ErrorMessage = $"Scraping already completed for {chain} on {date:yyyy-MM-dd}." };
                     }
                 }
 

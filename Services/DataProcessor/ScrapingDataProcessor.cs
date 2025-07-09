@@ -2,9 +2,11 @@
 using CijeneScraper.Data;
 using CijeneScraper.Models;
 using CijeneScraper.Models.Database;
+using CijeneScraper.Services.Geocoding;
 using CijeneScraper.Utility;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Threading;
 
 namespace CijeneScraper.Services.DataProcessor
 {
@@ -15,6 +17,7 @@ namespace CijeneScraper.Services.DataProcessor
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ScrapingDataProcessor> _logger;
+        private readonly IGeocodingService _geocodingService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScrapingDataProcessor"/> class.
@@ -23,10 +26,12 @@ namespace CijeneScraper.Services.DataProcessor
         /// <param name="logger">The logger instance.</param>
         public ScrapingDataProcessor(
             IServiceScopeFactory scopeFactory,
-            ILogger<ScrapingDataProcessor> logger)
+            ILogger<ScrapingDataProcessor> logger,
+            IGeocodingService geocodingService)
         {
             _scopeFactory = scopeFactory;
             _logger = logger;
+            _geocodingService = geocodingService;
         }
 
         /// <summary>
@@ -147,7 +152,11 @@ namespace CijeneScraper.Services.DataProcessor
         /// <param name="chain">The chain entity.</param>
         /// <param name="storeInfos">A collection of store information.</param>
         /// <param name="token">A cancellation token.</param>
-        private async Task ProcessStoresAsync(ApplicationDbContext dbContext, Chain chain, IEnumerable<StoreInfo> storeInfos, CancellationToken token)
+        private async Task ProcessStoresAsync(
+            ApplicationDbContext dbContext, 
+            Chain chain, 
+            IEnumerable<StoreInfo> storeInfos, 
+            CancellationToken token)
         {
             var storeCodes = storeInfos.Select(s => s.Code).ToHashSet();
 
@@ -161,13 +170,26 @@ namespace CijeneScraper.Services.DataProcessor
             {
                 if (!existingStores.TryGetValue(storeInfo.Code, out var store))
                 {
+                    var fullAddress = $"{storeInfo.Chain} {storeInfo.StreetAddress}, {storeInfo.PostalCode} {storeInfo.City}";
+                    var geocodingResult = await _geocodingService.GeocodeAsync(fullAddress, token);
+
+                    var geocodingResultCity = geocodingResult?.AddressComponents?.FirstOrDefault(ac => ac.Types.Contains("locality"))?.LongName;
+                    var geocofingResultPostalCode = geocodingResult?.AddressComponents?.FirstOrDefault(ac => ac.Types.Contains("postal_code"))?.LongName;
+                    //var geocodingAddress = geocodingResult?.AddressComponents?.FirstOrDefault(ac => ac.Types.Contains("route"))?.LongName;
+                    //var geocodingAddressNumber = geocodingResult?.AddressComponents?.FirstOrDefault(ac => ac.Types.Contains("street_number"))?.LongName;
+                    //geocodingAddress = geocodingAddressNumber != null 
+                    //    ? $"{geocodingAddress} {geocodingAddressNumber}" 
+                    //    : geocodingAddress;
+
                     store = new Store
                     {
                         Chain = chain,
                         Code = storeInfo.Code,
                         Address = storeInfo.StreetAddress,
-                        City = storeInfo.City,
-                        PostalCode = storeInfo.PostalCode
+                        City = geocodingResultCity ?? storeInfo.City,
+                        PostalCode = geocofingResultPostalCode ?? storeInfo.PostalCode,
+                        Latitude = geocodingResult?.Geometry.Location.Lat ?? 0.0,
+                        Longitude = geocodingResult?.Geometry.Location.Lng ?? 0.0
                     };
                     newStores.Add(store);
                 }

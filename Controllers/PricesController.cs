@@ -1,5 +1,6 @@
 ﻿using CijeneScraper.Data;
 using CijeneScraper.Models.ViewModel;
+using CijeneScraper.Services.Geocoding;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,14 +16,17 @@ namespace CijeneScraper.Controllers
     public class PricesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IGeocodingService _geocodingService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PricesController"/> class.
         /// </summary>
         /// <param name="context">The database context.</param>
-        public PricesController(ApplicationDbContext context)
+        /// <param name="geocodingService">The geocoding service.</param>
+        public PricesController(ApplicationDbContext context, IGeocodingService geocodingService)
         {
             _context = context;
+            _geocodingService = geocodingService;
         }
 
         /// <summary>
@@ -57,7 +61,7 @@ namespace CijeneScraper.Controllers
                     ChainName = o.ChainProduct.Chain.Name,
                     StoreName = o.Store.Address + ", " + o.Store.PostalCode + " " + o.Store.City,
                     ProductName = o.ChainProduct.Name,
-                    Amount = o.MPC ?? o.SpecialPrice ?? 0m
+                    Price = o.MPC ?? o.SpecialPrice ?? 0m
                 })
                 .Take(take)
                 .ToListAsync();
@@ -200,11 +204,11 @@ namespace CijeneScraper.Controllers
                         ChainName = p.ChainProduct.Chain.Name,
                         StoreName = p.Store.Address + ", " + p.Store.PostalCode + " " + p.Store.City,
                         ProductName = p.ChainProduct.Name,
-                        Amount = p.MPC ?? p.SpecialPrice ?? 0m
+                        Price = p.MPC ?? p.SpecialPrice ?? 0m
                     }
                 })
-                .Where(p => p.PriceViewModel.Amount > 0) // Filter prices with Amount > 0
-                .OrderBy(p => p.PriceViewModel.Amount); // Sort by Amount in ascending order;
+                .Where(p => p.PriceViewModel.Price > 0) // Filter prices with Amount > 0
+                .OrderBy(p => p.PriceViewModel.Price); // Sort by Amount in ascending order;
 
             var prices = await q
                 .ToListAsync(cancellationToken);
@@ -225,6 +229,123 @@ namespace CijeneScraper.Controllers
                 );
         
             return groupedPrices;
+        }
+
+        public class PriceNearbyViewModel : PriceViewModel
+        {
+            public double DistanceKm { get; set; }
+        }
+
+        /// <summary>
+        /// Retrieves prices for specified item codes from stores near the provided GPS coordinates.
+        /// </summary>
+        /// <param name="codes">A list of item codes (Product.Id) to find prices for.</param>
+        /// <param name="latitude">The user's latitude.</param>
+        /// <param name="longitude">The user's longitude.</param>
+        /// <param name="radiusKm">The search radius in kilometers (default: 5.0).</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A list of prices from nearby stores, ordered by distance.</returns>
+        [HttpGet("ByCodesNearby")]
+        public async Task<ActionResult<IEnumerable<PriceNearbyViewModel>>> GetPricesByCodesNearby(
+            [FromQuery] List<long> codes,
+            [FromQuery] double latitude,
+            [FromQuery] double longitude,
+            [FromQuery] double radiusKm = 5.0,
+            CancellationToken cancellationToken = default)
+        {
+            if (codes == null || codes.Count == 0)
+            {
+                return BadRequest("Item codes parameter is required.");
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+            // This part of the query is executed in-memory after fetching all stores,
+            // as distance calculation cannot be translated to SQL by default.
+            // For larger datasets, consider a database with spatial support (e.g., PostGIS).
+            var allStores = await _context.Stores.AsNoTracking().ToListAsync(cancellationToken);
+
+            // Geocode stores with missing coordinates
+            foreach (var store in allStores.Where(s => (s.Latitude == 0 || s.Longitude == 0) && !string.IsNullOrWhiteSpace(s.Address)))
+            {
+                var fullAddress = $"{store.Address}, {store.PostalCode} {store.City}";
+                var geocodeResult = await _geocodingService.GeocodeAsync(fullAddress, cancellationToken);
+                if (geocodeResult != null)
+                {
+                    store.Latitude = geocodeResult.Geometry.Location.Lat;
+                    store.Longitude = geocodeResult.Geometry.Location.Lng;
+                    _context.Update(store);
+                }
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var nearbyStores = allStores
+                .Select(s => new
+                {
+                    StoreId = s.Id,
+                    Distance = CalculateDistance(latitude, longitude, s.Latitude, s.Longitude)
+                })
+                .Where(s => s.Distance <= radiusKm)
+                .OrderBy(s => s.Distance)
+                .ToList();
+
+            var nearbyStoreIds = nearbyStores.Select(s => s.StoreId).ToList();
+            if (nearbyStoreIds.Count == 0)
+            {
+                return Ok(new List<PriceNearbyViewModel>());
+            }
+
+            var prices = await _context.Prices
+                .AsNoTracking()
+                .Include(p => p.ChainProduct)
+                .Include(p => p.ChainProduct.Chain)
+                .Include(p => p.Store)
+                .Where(p => p.Date == today &&
+                            nearbyStoreIds.Contains(p.StoreId) &&
+                            codes.Contains(p.ChainProduct.ProductId))
+                .Select(p => new
+                {
+                    Price = p,
+                    StoreId = p.StoreId
+                })
+                .ToListAsync(cancellationToken);
+
+            var result = prices
+                .Join(nearbyStores,
+                      priceInfo => priceInfo.StoreId,
+                      storeInfo => storeInfo.StoreId,
+                      (priceInfo, storeInfo) => new PriceNearbyViewModel
+                      {
+                          Date = priceInfo.Price.Date,
+                          ChainName = priceInfo.Price.ChainProduct.Chain.Name,
+                          StoreName = priceInfo.Price.Store.Address + ", " + priceInfo.Price.Store.PostalCode + " " + priceInfo.Price.Store.City,
+                          ProductName = priceInfo.Price.ChainProduct.Name,
+                          Price = priceInfo.Price.MPC ?? priceInfo.Price.SpecialPrice ?? 0m,
+                          DistanceKm = storeInfo.Distance
+                      })
+                .Where(p => p.Price > 0)
+                .OrderBy(p => p.DistanceKm)
+                .ThenBy(p => p.Price)
+                .ToList();
+
+            return Ok(result);
+        }
+
+        private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371; // Earth radius in kilometers
+            var dLat = ToRadians(lat2 - lat1);
+            var dLon = ToRadians(lon2 - lon1);
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
+
+        private static double ToRadians(double angle)
+        {
+            return Math.PI * angle / 180.0;
         }
     }
 }

@@ -20,6 +20,10 @@ namespace CijeneScraper.Models.Database
 
         public string? PostalCode { get; set; } = null!;
 
+        public double Latitude { get; set; }
+
+        public double Longitude { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [ForeignKey("ChainId")]

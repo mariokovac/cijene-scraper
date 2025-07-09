@@ -8,6 +8,7 @@ using CijeneScraper.Services.Caching.CSV;
 using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
+using CijeneScraper.Services.Geocoding;
 using CijeneScraper.Services.Notification;
 using CijeneScraper.Services.Scrape;
 using CijeneScraper.Services.Security;
@@ -42,6 +43,13 @@ namespace CijeneScraper
                 )
             );
             builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+            // Register the geocoding service
+            builder.Services.AddScoped<IGeocodingService, GeocodingService>();
+            builder.Services.AddHttpClient("GoogleGeocoding", client =>
+            {
+                client.BaseAddress = new Uri("https://maps.googleapis.com/");
+            });
 
             // Register application services and dependencies
             builder.Services.AddControllers();

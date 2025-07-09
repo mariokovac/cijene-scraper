@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CijeneScraper.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250708185327_InitialCreate")]
+    [Migration("20250709182841_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -230,6 +230,12 @@ namespace CijeneScraper.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("PostalCode")
                         .HasColumnType("text");
