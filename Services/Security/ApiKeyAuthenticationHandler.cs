@@ -9,14 +9,13 @@ namespace CijeneScraper.Services.Security
     {
         private const string ApiKeyHeaderName = "X-API-Key";
         private readonly IConfiguration _configuration;
-        
+
         public ApiKeyAuthenticationHandler(
             IOptionsMonitor<ApiKeyAuthenticationOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
-            ISystemClock clock,
-            IConfiguration configuration) 
-            : base(options, logger, encoder, clock)
+            IConfiguration configuration)
+            : base(options, logger, encoder)
         {
             _configuration = configuration;
         }
