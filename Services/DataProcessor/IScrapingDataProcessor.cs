@@ -1,5 +1,5 @@
 ﻿using CijeneScraper.Crawler;
-using CijeneScraper.Models;
+using CijeneScraper.Models.Crawler;
 
 namespace CijeneScraper.Services.DataProcessor
 {

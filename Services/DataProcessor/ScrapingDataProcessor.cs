@@ -1,6 +1,6 @@
 ﻿using CijeneScraper.Crawler;
 using CijeneScraper.Data;
-using CijeneScraper.Models;
+using CijeneScraper.Models.Crawler;
 using CijeneScraper.Models.Database;
 using CijeneScraper.Services.Geocoding;
 using CijeneScraper.Utility;

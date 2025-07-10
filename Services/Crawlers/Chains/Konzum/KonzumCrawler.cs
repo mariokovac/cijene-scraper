@@ -1,5 +1,5 @@
 ﻿using CijeneScraper.Crawler;
-using CijeneScraper.Models;
+using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
 using HtmlAgilityPack;
 using Microsoft.AspNetCore.WebUtilities;

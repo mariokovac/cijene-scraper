@@ -6,6 +6,7 @@
         public string ChainName { get; set; }
         public string StoreName { get; set; }
         public string ProductName { get; set; }
-        public decimal Price { get; set; }
+        public decimal? Price { get; set; }
+        public decimal? SpecialPrice { get; set; }
     }
 }

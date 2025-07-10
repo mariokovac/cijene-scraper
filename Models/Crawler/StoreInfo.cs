@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CijeneScraper.Models
+namespace CijeneScraper.Models.Crawler
 {
     public class StoreInfo
     {

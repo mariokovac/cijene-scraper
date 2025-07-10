@@ -33,12 +33,15 @@ namespace CijeneScraper.Controllers
         }
 
         /// <summary>
-        /// Retrieves a list of prices for the specified dates and optional chain.
+        /// Returns a filtered list of prices for the specified dates, with optional chain filtering and result limit.
         /// </summary>
-        /// <param name="dates">Array of dates to filter prices (required).</param>
-        /// <param name="take">Maximum number of results to return (default: 100).</param>
-        /// <param name="chain">Optional chain name to filter results.</param>
-        /// <returns>A list of <see cref="PriceInfo"/> objects matching the criteria.</returns>
+        /// <param name="dates">Required. Array of dates to filter prices by.</param>
+        /// <param name="take">Optional. Maximum number of results to return. Default is 100.</param>
+        /// <param name="chain">Optional. Chain name to filter prices by.</param>
+        /// <returns>
+        /// 200 OK with a list of <see cref="PriceInfo"/> matching the criteria.
+        /// 400 Bad Request if dates are not provided.
+        /// </returns>
         // GET: api/Prices
         public async Task<ActionResult<IEnumerable<PriceInfo>>> GetPrices(
             [FromQuery] DateOnly[] dates,
@@ -64,22 +67,21 @@ namespace CijeneScraper.Controllers
                     ChainName = o.ChainProduct.Chain.Name,
                     StoreName = o.Store.Address + ", " + o.Store.PostalCode + " " + o.Store.City,
                     ProductName = o.ChainProduct.Name,
-                    Price = o.MPC ?? o.SpecialPrice ?? 0m
+                    Price = o.MPC ?? o.SpecialPrice ?? o.SpecialPrice,
+                    SpecialPrice = o.SpecialPrice
                 })
                 .Take(take)
                 .ToListAsync();
         }
 
         /// <summary>
-        /// Retrieves a list of prices for a specific product (by barcode) on a given date across all stores and chains.
+        /// Returns all prices for a product identified by barcode on a specific date, across all stores and chains.
         /// </summary>
-        /// <param name="barcode">The product barcode (required).</param>
-        /// <param name="date">
-        /// The date for which to retrieve prices (optional, defaults to today if not provided).
-        /// </param>
+        /// <param name="barcode">Required. Product barcode to search for.</param>
+        /// <param name="date">Optional. Date to filter prices by. Defaults to today if not provided.</param>
         /// <returns>
-        /// A list of <see cref="PriceByBarcode"/> objects
-        /// Returns <c>400 Bad Request</c> if the barcode parameter is missing.
+        /// 200 OK with a list of <see cref="PriceByBarcode"/> for the product.
+        /// 400 Bad Request if barcode is not provided.
         /// </returns>
         [HttpGet("ByBarcode")]
         public async Task<ActionResult<IEnumerable<PriceByBarcode>>> GetPricesByBarcodeForDay(
@@ -112,11 +114,14 @@ namespace CijeneScraper.Controllers
         }
 
         /// <summary>
-        /// Retrieves the locations with the lowest price for a product by barcode on a specific date.
+        /// Returns all store locations offering the lowest price for a product (by barcode) on a given date.
         /// </summary>
-        /// <param name="barcode">The product barcode (required).</param>
-        /// <param name="date">The date to search for prices (optional, defaults to today).</param>
-        /// <returns>A list of <see cref="CheapestStoreInfo"/> for the lowest price locations.</returns>
+        /// <param name="barcode">Required. Product barcode to search for.</param>
+        /// <param name="date">Optional. Date to filter prices by. Defaults to today if not provided.</param>
+        /// <returns>
+        /// 200 OK with a list of <see cref="CheapestStoreInfo"/> for stores with the lowest price.
+        /// 400 Bad Request if barcode is not provided.
+        /// </returns>
         // GET: api/Prices/CheapestLocation?barcode=1234567890123&date=2025-07-15
         [HttpGet("CheapestLocation")]
         public async Task<ActionResult<IEnumerable<CheapestStoreInfo>>> GetCheapestLocation(string barcode, DateOnly? date = null)
@@ -157,12 +162,16 @@ namespace CijeneScraper.Controllers
         }
 
         /// <summary>
-        /// Retrieves prices for the specified product names grouped by chain and product name for today's date,
-        /// limiting the results to 5 stores per product unless a city is specified.
+        /// Returns prices for the specified product names, grouped by chain and product, for today.
+        /// Limits to 5 stores per product unless a city is specified.
         /// </summary>
-        /// <param name="productNames">List of product names (required).</param>
-        /// <param name="city">Optional city name to filter results.</param>
-        /// <returns>A dictionary where the key is the chain name, and the value is another dictionary with product names as keys and lists of prices as values.</returns>
+        /// <param name="cancellationToken">Cancellation token for the async operation.</param>
+        /// <param name="productNames">Required. List of product names to search for.</param>
+        /// <param name="city">Optional. City name to filter stores by.</param>
+        /// <returns>
+        /// 200 OK with a dictionary: chain name → product name → list of <see cref="PriceInfo"/>.
+        /// 400 Bad Request if productNames is not provided.
+        /// </returns>
         [HttpGet("ByProductNamesGrouped")]
         public async Task<ActionResult<Dictionary<string, Dictionary<string, List<PriceInfo>>>>> GetPricesByProductNamesGrouped(
             CancellationToken cancellationToken,
@@ -207,7 +216,8 @@ namespace CijeneScraper.Controllers
                         ChainName = p.ChainProduct.Chain.Name,
                         StoreName = p.Store.Address + ", " + p.Store.PostalCode + " " + p.Store.City,
                         ProductName = p.ChainProduct.Name,
-                        Price = p.MPC ?? p.SpecialPrice ?? 0m
+                        Price = p.MPC ?? p.SpecialPrice,
+                        SpecialPrice = p.SpecialPrice
                     }
                 })
                 .Where(p => p.PriceViewModel.Price > 0) // Filter prices with Amount > 0
@@ -234,22 +244,20 @@ namespace CijeneScraper.Controllers
             return groupedPrices;
         }
 
-        public class PriceNearbyViewModel : PriceInfo
-        {
-            public double DistanceKm { get; set; }
-        }
-
         /// <summary>
-        /// Retrieves prices for specified item codes from stores near the provided GPS coordinates.
+        /// Returns prices for specified product codes from stores within a given radius of the provided GPS coordinates.
         /// </summary>
-        /// <param name="codes">A list of item codes (Product.Id) to find prices for.</param>
-        /// <param name="latitude">The user's latitude.</param>
-        /// <param name="longitude">The user's longitude.</param>
-        /// <param name="radiusKm">The search radius in kilometers (default: 5.0).</param>
-        /// <param name="cancellationToken">A token to cancel the operation.</param>
-        /// <returns>A list of prices from nearby stores, ordered by distance.</returns>
+        /// <param name="codes">Required. List of product codes (Product.Id) to search for.</param>
+        /// <param name="latitude">Required. Latitude of the search center.</param>
+        /// <param name="longitude">Required. Longitude of the search center.</param>
+        /// <param name="radiusKm">Optional. Search radius in kilometers. Default is 5.0.</param>
+        /// <param name="cancellationToken">Cancellation token for the async operation.</param>
+        /// <returns>
+        /// 200 OK with a list of <see cref="PriceNearby"/> ordered by distance.
+        /// 400 Bad Request if codes are not provided.
+        /// </returns>
         [HttpGet("ByCodesNearby")]
-        public async Task<ActionResult<IEnumerable<PriceNearbyViewModel>>> GetPricesByCodesNearby(
+        public async Task<ActionResult<IEnumerable<PriceNearby>>> GetPricesByCodesNearby(
             [FromQuery] List<long> codes,
             [FromQuery] double latitude,
             [FromQuery] double longitude,
@@ -295,7 +303,7 @@ namespace CijeneScraper.Controllers
             var nearbyStoreIds = nearbyStores.Select(s => s.StoreId).ToList();
             if (nearbyStoreIds.Count == 0)
             {
-                return Ok(new List<PriceNearbyViewModel>());
+                return Ok(new List<PriceNearby>());
             }
 
             var prices = await _context.Prices
@@ -317,13 +325,14 @@ namespace CijeneScraper.Controllers
                 .Join(nearbyStores,
                       priceInfo => priceInfo.StoreId,
                       storeInfo => storeInfo.StoreId,
-                      (priceInfo, storeInfo) => new PriceNearbyViewModel
+                      (priceInfo, storeInfo) => new PriceNearby
                       {
                           Date = priceInfo.Price.Date,
                           ChainName = priceInfo.Price.ChainProduct.Chain.Name,
                           StoreName = priceInfo.Price.Store.Address + ", " + priceInfo.Price.Store.PostalCode + " " + priceInfo.Price.Store.City,
                           ProductName = priceInfo.Price.ChainProduct.Name,
-                          Price = priceInfo.Price.MPC ?? priceInfo.Price.SpecialPrice ?? 0m,
+                          Price = priceInfo.Price.MPC ?? priceInfo.Price.SpecialPrice,
+                          SpecialPrice = priceInfo.Price.SpecialPrice,
                           DistanceKm = storeInfo.Distance
                       })
                 .Where(p => p.Price > 0)
@@ -335,13 +344,16 @@ namespace CijeneScraper.Controllers
         }
 
         /// <summary>
-        /// Searches for products and returns detailed information including price statistics.
+        /// Searches for products by name or brand and returns product details with price statistics for each chain.
         /// </summary>
-        /// <param name="q">The search query to filter products by name.</param>
-        /// <param name="datum">Optional date for price statistics, defaults to today.</param>
-        /// <param name="chains">Optional list of chain names to filter results.</param>
-        /// <param name="cancellationToken">A token to cancel the operation.</param>
-        /// <returns>A list of products with their details and price statistics across specified chains.</returns>
+        /// <param name="q">Required. Search query for product name or brand.</param>
+        /// <param name="datum">Optional. Date for price statistics. Defaults to today if not provided.</param>
+        /// <param name="chains">Optional. List of chain names to filter results by.</param>
+        /// <param name="cancellationToken">Cancellation token for the async operation.</param>
+        /// <returns>
+        /// 200 OK with a list of <see cref="ProductOverview"/> including price statistics.
+        /// 400 Bad Request if search query is not provided.
+        /// </returns>
         [HttpGet("SearchProducts")]
         public async Task<ActionResult<IEnumerable<ProductOverview>>> SearchProducts(
             [FromQuery] string q,

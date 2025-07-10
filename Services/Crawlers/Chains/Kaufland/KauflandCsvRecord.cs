@@ -1,4 +1,4 @@
-﻿using CijeneScraper.Models;
+﻿using CijeneScraper.Models.Crawler;
 using CijeneScraper.Utility;
 using CsvHelper.Configuration.Attributes;
 using System.Globalization;

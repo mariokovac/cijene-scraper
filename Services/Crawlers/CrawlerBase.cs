@@ -1,5 +1,5 @@
 ﻿using CijeneScraper.Controllers;
-using CijeneScraper.Models;
+using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
 using CijeneScraper.Utility;
 using CsvHelper;

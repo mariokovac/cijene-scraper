@@ -1,4 +1,4 @@
-﻿using CijeneScraper.Models;
+﻿using CijeneScraper.Models.Crawler;
 using System.Text;
 
 namespace CijeneScraper.Crawler
