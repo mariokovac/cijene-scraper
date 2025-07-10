@@ -81,6 +81,18 @@ namespace CijeneScraper
             // Register OpenAPI/Swagger services
             builder.Services.AddOpenApiDocument();
 
+            // Add CORS policy
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy
+                        .AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
+                });
+            });
+
             var app = builder.Build();
 
             // Enable OpenAPI and Swagger UI
@@ -93,6 +105,8 @@ namespace CijeneScraper
 
             app.UseHttpsRedirection();
             app.UseAuthorization();
+
+            app.UseCors("AllowAll");
 
             // Map OpenAPI and controller endpoints
             app.MapOpenApi();
