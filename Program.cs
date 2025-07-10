@@ -85,11 +85,7 @@ namespace CijeneScraper
 
             // Enable OpenAPI and Swagger UI
             app.UseOpenApi();
-            app.UseSwaggerUi(c =>
-            {
-                c.Path = "/swagger";
-                c.DocumentPath = "/swagger/v1/swagger.json";
-            });
+            app.UseSwaggerUi();
 
             app.UseHttpsRedirection();
             app.UseAuthorization();

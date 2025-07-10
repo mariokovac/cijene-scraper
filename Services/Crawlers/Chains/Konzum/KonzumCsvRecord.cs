@@ -57,7 +57,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
             {
                 ProductCode = p.ProductCode,
                 Barcode = p.Barcode.NormalizeBarcode(p.ProductCode),
-                Name = p.Product,
+                Name = p.Product.Trim(),
                 Price = decimal.TryParse(p.Price, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : (decimal?)null,
                 Brand = p.Brand,
                 UOM = p.Unit,

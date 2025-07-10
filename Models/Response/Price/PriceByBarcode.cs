@@ -1,6 +1,6 @@
-﻿namespace CijeneScraper.Models.ViewModel
+﻿namespace CijeneScraper.Models.Response.Price
 {
-    public class PriceByBarcodeViewModel
+    public class PriceByBarcode
     {
         public DateOnly Date { get; set; }
         public string ChainName { get; set; }

@@ -1,6 +1,6 @@
-﻿namespace CijeneScraper.Models.ViewModel
+﻿namespace CijeneScraper.Models.Response.Store
 {
-    public class CheapestLocationViewModel
+    public class CheapestStoreInfo
     {
         public string Chain { get; set; }
         public string ProductName { get; set; }

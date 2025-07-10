@@ -1,6 +1,9 @@
 ﻿using CijeneScraper.Data;
-using CijeneScraper.Models.ViewModel;
+using CijeneScraper.Models.Response.Price;
+using CijeneScraper.Models.Response.Product;
+using CijeneScraper.Models.Response.Store;
 using CijeneScraper.Services.Geocoding;
+using CijeneScraper.Utility;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,9 +38,9 @@ namespace CijeneScraper.Controllers
         /// <param name="dates">Array of dates to filter prices (required).</param>
         /// <param name="take">Maximum number of results to return (default: 100).</param>
         /// <param name="chain">Optional chain name to filter results.</param>
-        /// <returns>A list of <see cref="PriceViewModel"/> objects matching the criteria.</returns>
+        /// <returns>A list of <see cref="PriceInfo"/> objects matching the criteria.</returns>
         // GET: api/Prices
-        public async Task<ActionResult<IEnumerable<PriceViewModel>>> GetPrices(
+        public async Task<ActionResult<IEnumerable<PriceInfo>>> GetPrices(
             [FromQuery] DateOnly[] dates,
             int take = 100,
             string chain = null)
@@ -55,7 +58,7 @@ namespace CijeneScraper.Controllers
                 .Include(p => p.Store)
                 .Where(o => dates.Contains(o.Date))
                 .Where(o => string.IsNullOrEmpty(chain) || o.ChainProduct.Chain.Name == chain)
-                .Select(o => new PriceViewModel
+                .Select(o => new PriceInfo
                 {
                     Date = o.Date,
                     ChainName = o.ChainProduct.Chain.Name,
@@ -75,11 +78,11 @@ namespace CijeneScraper.Controllers
         /// The date for which to retrieve prices (optional, defaults to today if not provided).
         /// </param>
         /// <returns>
-        /// A list of <see cref="PriceByBarcodeViewModel"/> objects
+        /// A list of <see cref="PriceByBarcode"/> objects
         /// Returns <c>400 Bad Request</c> if the barcode parameter is missing.
         /// </returns>
         [HttpGet("ByBarcode")]
-        public async Task<ActionResult<IEnumerable<PriceByBarcodeViewModel>>> GetPricesByBarcodeForDay(
+        public async Task<ActionResult<IEnumerable<PriceByBarcode>>> GetPricesByBarcodeForDay(
             [FromQuery] string barcode,
             [FromQuery] DateOnly? date = null)
         {
@@ -95,7 +98,7 @@ namespace CijeneScraper.Controllers
                 .Include(p => p.ChainProduct)
                 .Include(p => p.Store)
                 .Where(p => p.ChainProduct.Barcode == barcode && p.Date == date.Value)
-                .Select(p => new PriceByBarcodeViewModel
+                .Select(p => new PriceByBarcode
                 {
                     Date = p.Date,
                     ChainName = p.ChainProduct.Chain.Name,
@@ -113,10 +116,10 @@ namespace CijeneScraper.Controllers
         /// </summary>
         /// <param name="barcode">The product barcode (required).</param>
         /// <param name="date">The date to search for prices (optional, defaults to today).</param>
-        /// <returns>A list of <see cref="CheapestLocationViewModel"/> for the lowest price locations.</returns>
+        /// <returns>A list of <see cref="CheapestStoreInfo"/> for the lowest price locations.</returns>
         // GET: api/Prices/CheapestLocation?barcode=1234567890123&date=2025-07-15
         [HttpGet("CheapestLocation")]
-        public async Task<ActionResult<IEnumerable<CheapestLocationViewModel>>> GetCheapestLocation(string barcode, DateOnly? date = null)
+        public async Task<ActionResult<IEnumerable<CheapestStoreInfo>>> GetCheapestLocation(string barcode, DateOnly? date = null)
         {
             // Validate the barcode parameter
             if (barcode == null)
@@ -134,7 +137,7 @@ namespace CijeneScraper.Controllers
                 .Include(p => p.Store.Chain)
                 .Where(p => p.ChainProduct.Barcode == barcode && p.Date == date.Value)
                 .OrderBy(p => p.MPC ?? p.SpecialPrice)
-                .Select(p => new CheapestLocationViewModel
+                .Select(p => new CheapestStoreInfo
                 {
                     Chain = p.Store.Chain.Name,
                     Date = p.Date,
@@ -161,7 +164,7 @@ namespace CijeneScraper.Controllers
         /// <param name="city">Optional city name to filter results.</param>
         /// <returns>A dictionary where the key is the chain name, and the value is another dictionary with product names as keys and lists of prices as values.</returns>
         [HttpGet("ByProductNamesGrouped")]
-        public async Task<ActionResult<Dictionary<string, Dictionary<string, List<PriceViewModel>>>>> GetPricesByProductNamesGrouped(
+        public async Task<ActionResult<Dictionary<string, Dictionary<string, List<PriceInfo>>>>> GetPricesByProductNamesGrouped(
             CancellationToken cancellationToken,
             [FromQuery] List<string> productNames,
             [FromQuery] string? city = null)
@@ -198,7 +201,7 @@ namespace CijeneScraper.Controllers
                 {
                     ChainName = p.ChainProduct.Chain.Name,
                     ProductName = p.ChainProduct.Name,
-                    PriceViewModel = new PriceViewModel
+                    PriceViewModel = new PriceInfo
                     {
                         Date = p.Date,
                         ChainName = p.ChainProduct.Chain.Name,
@@ -231,7 +234,7 @@ namespace CijeneScraper.Controllers
             return groupedPrices;
         }
 
-        public class PriceNearbyViewModel : PriceViewModel
+        public class PriceNearbyViewModel : PriceInfo
         {
             public double DistanceKm { get; set; }
         }
@@ -283,7 +286,7 @@ namespace CijeneScraper.Controllers
                 .Select(s => new
                 {
                     StoreId = s.Id,
-                    Distance = CalculateDistance(latitude, longitude, s.Latitude, s.Longitude)
+                    Distance = GeoHelpers.CalculateDistance(latitude, longitude, s.Latitude, s.Longitude)
                 })
                 .Where(s => s.Distance <= radiusKm)
                 .OrderBy(s => s.Distance)
@@ -331,21 +334,73 @@ namespace CijeneScraper.Controllers
             return Ok(result);
         }
 
-        private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        /// <summary>
+        /// Searches for products and returns detailed information including price statistics.
+        /// </summary>
+        /// <param name="q">The search query to filter products by name.</param>
+        /// <param name="datum">Optional date for price statistics, defaults to today.</param>
+        /// <param name="chains">Optional list of chain names to filter results.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A list of products with their details and price statistics across specified chains.</returns>
+        [HttpGet("SearchProducts")]
+        public async Task<ActionResult<IEnumerable<ProductOverview>>> SearchProducts(
+            [FromQuery] string q,
+            [FromQuery] DateOnly? datum = null,
+            [FromQuery] List<string>? chains = null,
+            CancellationToken cancellationToken = default)
         {
-            const double R = 6371; // Earth radius in kilometers
-            var dLat = ToRadians(lat2 - lat1);
-            var dLon = ToRadians(lon2 - lon1);
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return R * c;
-        }
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                return BadRequest("Search query parameter 'q' is required.");
+            }
 
-        private static double ToRadians(double angle)
-        {
-            return Math.PI * angle / 180.0;
+            var searchDate = datum ?? DateOnly.FromDateTime(DateTime.UtcNow.Date);
+            var lowerCaseQuery = q.ToLower();
+
+            var query = _context.Products.AsNoTracking()
+                .Where(p => p.Name.ToLower().Contains(lowerCaseQuery) || (p.Brand != null && p.Brand.ToLower().Contains(lowerCaseQuery)));
+
+            var products = await query
+                .Select(p => new
+                {
+                    Product = p,
+                    ChainProducts = p.ChainProducts
+                        .Where(cp => (chains == null || chains.Count == 0 || chains.Contains(cp.Chain.Name)))
+                        .Select(cp => new
+                        {
+                            ChainProduct = cp,
+                            Chain = cp.Chain,
+                            Prices = cp.Prices
+                                .Where(price => price.Date == searchDate && (price.MPC.HasValue || price.SpecialPrice.HasValue))
+                                .Select(price => price.MPC ?? price.SpecialPrice ?? 0)
+                        })
+                        .Where(cp => cp.Prices.Any())
+                })
+                .Where(p => p.ChainProducts.Any())
+                .ToListAsync(cancellationToken);
+
+            var result = products.Select(a => new ProductOverview
+            {
+                Barcode = a.Product.Barcode,
+                Brand = a.Product.Brand,
+                Name = a.Product.Name,
+                Chains = a.ChainProducts.Select(cp => new ProductChainInfo
+                {
+                    Chain = cp.Chain.Name,
+                    StoreProductCode = cp.ChainProduct.Code,
+                    Name = cp.ChainProduct.Name,
+                    Brand = cp.ChainProduct.Brand,
+                    Category = a.Product.Category,
+                    PriceStatistics = new PriceStatistics
+                    {
+                        MinPrice = cp.Prices.Min(),
+                        MaxPrice = cp.Prices.Max(),
+                        AvgPrice = cp.Prices.Average()
+                    }
+                }).ToList()
+            }).ToList();
+
+            return Ok(result);
         }
     }
 }
