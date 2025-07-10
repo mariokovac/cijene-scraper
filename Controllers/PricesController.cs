@@ -393,6 +393,7 @@ namespace CijeneScraper.Controllers
 
             var result = products.Select(a => new ProductOverview
             {
+                Id = a.Product.Id,
                 Barcode = a.Product.Barcode,
                 Brand = a.Product.Brand,
                 Name = a.Product.Name,
