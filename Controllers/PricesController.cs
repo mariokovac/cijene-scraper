@@ -327,6 +327,7 @@ namespace CijeneScraper.Controllers
                       storeInfo => storeInfo.StoreId,
                       (priceInfo, storeInfo) => new PriceNearby
                       {
+                          ProductId = priceInfo.Price.ChainProduct.ProductId,
                           Date = priceInfo.Price.Date,
                           ChainName = priceInfo.Price.ChainProduct.Chain.Name,
                           StoreName = priceInfo.Price.Store.Address + ", " + priceInfo.Price.Store.PostalCode + " " + priceInfo.Price.Store.City,

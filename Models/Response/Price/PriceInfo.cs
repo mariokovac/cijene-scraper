@@ -2,6 +2,7 @@
 {
     public class PriceInfo
     {
+        public long ProductId { get; set; }
         public DateOnly Date { get; set; }
         public string ChainName { get; set; }
         public string StoreName { get; set; }
