@@ -414,5 +414,32 @@ namespace CijeneScraper.Controllers
 
             return Ok(result);
         }
+
+        /// <summary>
+        /// Returns the number of recorded prices per chain and day.
+        /// </summary>
+        /// <returns>
+        /// 200 OK with a list of statistics: chain name, date, and number of prices.
+        /// </returns>
+        [HttpGet("Statistics")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<PriceReportStatistics>>> GetPriceStatistics()
+        {
+            var stats = await _context.Prices
+                .Include(p => p.ChainProduct)
+                .ThenInclude(cp => cp.Chain)
+                .GroupBy(p => new { ChainName = p.ChainProduct.Chain.Name, p.Date })
+                .Select(g => new PriceReportStatistics
+                {
+                    ChainName = g.Key.ChainName,
+                    Date = g.Key.Date,
+                    NumPrices = g.Count()
+                })
+                .OrderBy(x => x.ChainName)
+                .ThenBy(x => x.Date)
+                .ToListAsync();
+
+            return Ok(stats);
+        }
     }
 }
