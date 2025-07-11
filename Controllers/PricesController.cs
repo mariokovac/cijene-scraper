@@ -209,13 +209,13 @@ namespace CijeneScraper.Controllers
                 .Select(p => new
                 {
                     ChainName = p.ChainProduct.Chain.Name,
-                    ProductName = p.ChainProduct.Name,
+                    ProductName = p.ChainProduct.Product.Name,
                     PriceViewModel = new PriceInfo
                     {
                         Date = p.Date,
                         ChainName = p.ChainProduct.Chain.Name,
                         StoreName = p.Store.Address + ", " + p.Store.PostalCode + " " + p.Store.City,
-                        ProductName = p.ChainProduct.Name,
+                        ProductName = p.ChainProduct.Product.Name,
                         Price = p.MPC ?? p.SpecialPrice,
                         SpecialPrice = p.SpecialPrice
                     }
@@ -310,6 +310,7 @@ namespace CijeneScraper.Controllers
                 .AsNoTracking()
                 .Include(p => p.ChainProduct)
                 .Include(p => p.ChainProduct.Chain)
+                .Include(p => p.ChainProduct.Product)
                 .Include(p => p.Store)
                 .Where(p => p.Date == today &&
                             nearbyStoreIds.Contains(p.StoreId) &&
@@ -331,7 +332,7 @@ namespace CijeneScraper.Controllers
                           Date = priceInfo.Price.Date,
                           ChainName = priceInfo.Price.ChainProduct.Chain.Name,
                           StoreName = priceInfo.Price.Store.Address + ", " + priceInfo.Price.Store.PostalCode + " " + priceInfo.Price.Store.City,
-                          ProductName = priceInfo.Price.ChainProduct.Name,
+                          ProductName = priceInfo.Price.ChainProduct.Product.Name,
                           Price = priceInfo.Price.MPC ?? priceInfo.Price.SpecialPrice,
                           SpecialPrice = priceInfo.Price.SpecialPrice,
                           DistanceKm = storeInfo.Distance
