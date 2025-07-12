@@ -97,14 +97,17 @@ namespace CijeneScraper.Services.Scrape
                         dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
                     }
 
-                    // After successful completion, log the job
-                    _dbContext.ScrapingJobs.Add(new ScrapingJob
+                    if (changes != 0)
                     {
-                        Chain = dbChain,
-                        Date = date,
-                        CompletedAt = DateTime.UtcNow
-                    });
-                    await _dbContext.SaveChangesAsync(cancellationToken);
+                        // After successful completion, log the job
+                        _dbContext.ScrapingJobs.Add(new ScrapingJob
+                        {
+                            Chain = dbChain,
+                            Date = date,
+                            CompletedAt = DateTime.UtcNow
+                        });
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
 
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
