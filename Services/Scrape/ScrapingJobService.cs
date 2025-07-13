@@ -107,15 +107,16 @@ namespace CijeneScraper.Services.Scrape
                             CompletedAt = DateTime.UtcNow
                         });
                         await _dbContext.SaveChangesAsync(cancellationToken);
+                        _logger.LogInformation("Logging scraping success for chain {Chain} in DB.ScrapingJobs.", c.Chain);
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
 
-                    _queue.Enqueue(async token =>
-                    {
-                        await _dbContext.Database.ExecuteSqlRawAsync("REINDEX TABLE 'Prices'");
-                    });
+                    //_queue.Enqueue(async token =>
+                    //{
+                    //    await _dbContext.Database.ExecuteSqlRawAsync("REINDEX TABLE 'Prices'");
+                    //});
 
                     try
                     {
