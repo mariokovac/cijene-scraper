@@ -14,7 +14,6 @@ namespace CijeneScraper.Services.Scrape
         private readonly Dictionary<string, ICrawler> _crawlers;
         private readonly IScrapingDataProcessor _dataProcessor;
         private readonly IEmailNotificationService _emailService;
-        private readonly ScrapingQueue _queue;
         private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<ScrapingJobService> _logger;
 
@@ -24,14 +23,12 @@ namespace CijeneScraper.Services.Scrape
             IEnumerable<ICrawler> crawlers,
             IScrapingDataProcessor dataProcessor,
             IEmailNotificationService emailService,
-            ScrapingQueue queue,
             ApplicationDbContext dbContext,
             ILogger<ScrapingJobService> logger)
         {
             _crawlers = crawlers.ToDictionary(c => c.Chain, StringComparer.OrdinalIgnoreCase);
             _dataProcessor = dataProcessor;
             _emailService = emailService;
-            _queue = queue;
             _dbContext = dbContext;
             _logger = logger;
         }
@@ -112,11 +109,6 @@ namespace CijeneScraper.Services.Scrape
 
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
-
-                    //_queue.Enqueue(async token =>
-                    //{
-                    //    await _dbContext.Database.ExecuteSqlRawAsync("REINDEX TABLE 'Prices'");
-                    //});
 
                     try
                     {

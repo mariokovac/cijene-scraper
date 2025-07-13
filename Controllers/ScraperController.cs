@@ -14,6 +14,7 @@ namespace CijeneScraper.Controllers
     [Route("api/[controller]")]
     public class ScraperController : ControllerBase
     {
+        private readonly ScrapingQueue _queue;
         private readonly ILogger<ScraperController> _logger;
         private readonly ApplicationDbContext _dbContext;
         private readonly IScrapingJobService _scrapingJobService;
@@ -31,6 +32,7 @@ namespace CijeneScraper.Controllers
             IScrapingJobService scrapingJobService
             )
         {
+            _queue = queue;
             _logger = logger;
             _dbContext = dbContext;
             _scrapingJobService = scrapingJobService;
@@ -52,28 +54,19 @@ namespace CijeneScraper.Controllers
         /// A flag indicating whether to force the scraping operation, bypassing certain checks.
         /// </param>
         /// <returns>
-        /// - <see cref="OkObjectResult"/> (HTTP 200) if the scraping job(s) complete successfully.
-        /// - <see cref="BadRequestObjectResult"/> (HTTP 400) if the chain name is invalid, unknown, or the request is cancelled.
+        /// - <see cref="AcceptedResult"/> (HTTP 202) if the scraping job is successfully queued.
+        /// - <see cref="ConflictObjectResult"/> (HTTP 409) if a scraping job is already running.
         /// </returns>
         /// <remarks>
         /// This endpoint:
         /// <list type="number">
-        /// <item>Validates the chain parameter and resolves the appropriate crawler(s).</item>
-        /// <item>For each crawler:
-        ///   <list type="bullet">
-        ///     <item>Performs the scraping operation for the specified date.</item>
-        ///     <item>Processes and persists the scraped data to the database.</item>
-        ///     <item>Clears the crawler's cache for the date.</item>
-        ///     <item>Schedules a background database reindex for the Prices table.</item>
-        ///     <item>Sends email notifications on both success and failure.</item>
-        ///     <item>Logs all major steps and errors.</item>
-        ///   </list>
-        /// </item>
-        /// <item>Handles cancellation and exceptions, ensuring resources are released and notifications are sent as appropriate.</item>
+        /// <item>Checks if a scraping job is already running.</item>
+        /// <item>If not, enqueues a new scraping job.</item>
+        /// <item>Returns appropriate HTTP status codes based on the operation's outcome.</item>
         /// </list>
         /// </remarks>
         [HttpPost("start/{chain}")]
-        public async Task<IActionResult> StartScraping(
+        public IActionResult StartScraping(
             CancellationToken cancellationToken,
             string chain, 
             DateOnly? date = null,
@@ -81,12 +74,31 @@ namespace CijeneScraper.Controllers
         {
             date ??= DateOnly.FromDateTime(DateTime.UtcNow);
 
-            var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, cancellationToken, force);
+            if (_queue.IsRunning)
+            {
+                if (force)
+                {
+                    _queue.CancelCurrent();
+                    _queue.Enqueue(async ct =>
+                    {
+                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                        // Optionally log result or send notification here
+                    });
+                    return Accepted($"Previous scraping job cancelled. New job for chain '{chain}' and date '{date.Value}' has been queued.");
+                }
+                else
+                {
+                    return Conflict("Scraping job is already running. Only one job can run at a time.");
+                }
+            }
 
-            if (!result.Success)
-                return BadRequest(result.ErrorMessage);
+            _queue.Enqueue(async ct =>
+            {
+                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                // Optionally log result or send notification here
+            });
 
-            return Ok(result.Message);
+            return Accepted($"Scraping job for chain '{chain}' and date '{date.Value}' has been queued.");
         }
 
         /// <summary>
