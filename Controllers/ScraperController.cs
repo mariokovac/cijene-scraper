@@ -17,7 +17,8 @@ namespace CijeneScraper.Controllers
         private readonly ScrapingQueue _queue;
         private readonly ILogger<ScraperController> _logger;
         private readonly ApplicationDbContext _dbContext;
-        private readonly IScrapingJobService _scrapingJobService;
+        //private readonly IScrapingJobService _scrapingJobService;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScraperController"/> class.
@@ -29,13 +30,15 @@ namespace CijeneScraper.Controllers
         public ScraperController(ScrapingQueue queue,
             ILogger<ScraperController> logger,
             ApplicationDbContext dbContext,
-            IScrapingJobService scrapingJobService
+            //IScrapingJobService scrapingJobService,
+            IServiceScopeFactory scopeFactory
             )
         {
             _queue = queue;
             _logger = logger;
             _dbContext = dbContext;
-            _scrapingJobService = scrapingJobService;
+            //_scrapingJobService = scrapingJobService;
+            _scopeFactory = scopeFactory;
         }
 
         /// <summary>
@@ -81,7 +84,10 @@ namespace CijeneScraper.Controllers
                     _queue.CancelCurrent();
                     _queue.Enqueue(async ct =>
                     {
-                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                        using var scope = _scopeFactory.CreateScope();
+                        var scrapingJobService = scope.ServiceProvider.GetRequiredService<IScrapingJobService>();
+
+                        var result = await scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
                         // Optionally log result or send notification here
                     });
                     return Accepted($"Previous scraping job cancelled. New job for chain '{chain}' and date '{date.Value}' has been queued.");
@@ -94,7 +100,10 @@ namespace CijeneScraper.Controllers
 
             _queue.Enqueue(async ct =>
             {
-                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                using var scope = _scopeFactory.CreateScope();
+                var scrapingJobService = scope.ServiceProvider.GetRequiredService<IScrapingJobService>();
+
+                var result = await scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
                 // Optionally log result or send notification here
             });
 
