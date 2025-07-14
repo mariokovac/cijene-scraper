@@ -92,6 +92,20 @@ namespace CijeneScraper.Services.Scrape
                         }
                     }
                 }
+                else
+                {
+                    // When force is true, log that we're overriding an existing job if it exists
+                    dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
+                    if (dbChain != null)
+                    {
+                        bool alreadyDone = await _dbContext.ScrapingJobs
+                            .AnyAsync(j => j.ChainID == dbChain.Id && j.Date == date, cancellationToken);
+                        if (alreadyDone)
+                        {
+                            _logger.LogInformation("Force flag enabled - overriding existing scraping job for {Chain} on {Date}", c.Chain, date);
+                        }
+                    }
+                }
 
                 int changes = 0;
                 try
@@ -121,20 +135,37 @@ namespace CijeneScraper.Services.Scrape
                         dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
                     }
 
-                    // Create legacy ScrapingJob record
-                    var scrapingJob = new ScrapingJob
-                    {
-                        ChainID = dbChain!.Id,
-                        Date = date,
-                        StartedAt = jobLog.StartedAt,
-                        CompletedAt = DateTime.UtcNow,
-                        InitiatedBy = initiatedBy,
-                        IsForced = force,
-                        PriceChanges = changes,
-                        ScrapingJobLogId = jobLog.Id
-                    };
+                    // Create or update legacy ScrapingJob record
+                    var existingScrapingJob = await _dbContext.ScrapingJobs
+                        .FirstOrDefaultAsync(j => j.ChainID == dbChain!.Id && j.Date == date, cancellationToken);
 
-                    _dbContext.ScrapingJobs.Add(scrapingJob);
+                    if (existingScrapingJob != null)
+                    {
+                        // Update existing record
+                        existingScrapingJob.CompletedAt = DateTime.UtcNow;
+                        existingScrapingJob.InitiatedBy = initiatedBy;
+                        existingScrapingJob.IsForced = force;
+                        existingScrapingJob.PriceChanges = changes;
+                        existingScrapingJob.ScrapingJobLogId = jobLog.Id;
+                    }
+                    else
+                    {
+                        // Create new record
+                        var scrapingJob = new ScrapingJob
+                        {
+                            ChainID = dbChain!.Id,
+                            Date = date,
+                            StartedAt = jobLog.StartedAt,
+                            CompletedAt = DateTime.UtcNow,
+                            InitiatedBy = initiatedBy,
+                            IsForced = force,
+                            PriceChanges = changes,
+                            ScrapingJobLogId = jobLog.Id
+                        };
+
+                        _dbContext.ScrapingJobs.Add(scrapingJob);
+                    }
+
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
