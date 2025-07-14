@@ -34,15 +34,13 @@ namespace CijeneScraper.Controllers
         public ScraperController(ScrapingQueue queue,
             ILogger<ScraperController> logger,
             ApplicationDbContext dbContext,
-            IScrapingJobService scrapingJobService,
-            IScrapingJobLogService jobLogService
+            IScrapingJobService scrapingJobService
             )
         {
             _queue = queue;
             _logger = logger;
             _dbContext = dbContext;
             _scrapingJobService = scrapingJobService;
-            _jobLogService = jobLogService;
         }
 
         /// <summary>
@@ -97,9 +95,8 @@ namespace CijeneScraper.Controllers
                     _queue.CancelCurrent();
                     _queue.Enqueue(async ct =>
                     {
-                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force, initiatedBy, RequestSource.API);
-                        _logger.LogInformation("Queued scraping job completed: {Success}, Message: {Message}, Error: {Error}", 
-                            result.Success, result.Message, result.ErrorMessage);
+                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                        // Optionally log result or send notification here
                     });
                     return Accepted($"Previous scraping job cancelled. New job for chain '{chain}' and date '{date.Value}' has been queued.");
                 }
@@ -112,9 +109,8 @@ namespace CijeneScraper.Controllers
 
             _queue.Enqueue(async ct =>
             {
-                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force, initiatedBy, RequestSource.API);
-                _logger.LogInformation("Queued scraping job completed: {Success}, Message: {Message}, Error: {Error}", 
-                    result.Success, result.Message, result.ErrorMessage);
+                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
+                // Optionally log result or send notification here
             });
 
             return Accepted($"Scraping job for chain '{chain}' and date '{date.Value}' has been queued.");
