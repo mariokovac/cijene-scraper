@@ -1,7 +1,10 @@
 ﻿using CijeneScraper.Data;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Scrape;
+using CijeneScraper.Services.Logging;
+using CijeneScraper.Models.Database;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace CijeneScraper.Controllers
 {
@@ -18,6 +21,7 @@ namespace CijeneScraper.Controllers
         private readonly ILogger<ScraperController> _logger;
         private readonly ApplicationDbContext _dbContext;
         private readonly IScrapingJobService _scrapingJobService;
+        private readonly IScrapingJobLogService _jobLogService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ScraperController"/> class.
@@ -26,16 +30,19 @@ namespace CijeneScraper.Controllers
         /// <param name="logger">The logger instance for logging information and errors.</param>
         /// <param name="dbContext">The database context for accessing application data.</param>
         /// <param name="scrapingJobService">The service responsible for executing and managing scraping jobs.</param>
+        /// <param name="jobLogService">The service for detailed job logging and tracking.</param>
         public ScraperController(ScrapingQueue queue,
             ILogger<ScraperController> logger,
             ApplicationDbContext dbContext,
-            IScrapingJobService scrapingJobService
+            IScrapingJobService scrapingJobService,
+            IScrapingJobLogService jobLogService
             )
         {
             _queue = queue;
             _logger = logger;
             _dbContext = dbContext;
             _scrapingJobService = scrapingJobService;
+            _jobLogService = jobLogService;
         }
 
         /// <summary>
@@ -74,28 +81,40 @@ namespace CijeneScraper.Controllers
         {
             date ??= DateOnly.FromDateTime(DateTime.UtcNow);
 
+            // Capture user information
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
+            var initiatedBy = $"API:{ipAddress}";
+
+            _logger.LogInformation("Scraping request received for chain {Chain} on {Date} from {IpAddress} (Force: {Force})", 
+                chain, date, ipAddress, force);
+
             if (_queue.IsRunning)
             {
                 if (force)
                 {
+                    _logger.LogWarning("Cancelling current scraping job to start new one for {Chain} on {Date}", chain, date);
                     _queue.CancelCurrent();
                     _queue.Enqueue(async ct =>
                     {
-                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
-                        // Optionally log result or send notification here
+                        var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force, initiatedBy, RequestSource.API);
+                        _logger.LogInformation("Queued scraping job completed: {Success}, Message: {Message}, Error: {Error}", 
+                            result.Success, result.Message, result.ErrorMessage);
                     });
                     return Accepted($"Previous scraping job cancelled. New job for chain '{chain}' and date '{date.Value}' has been queued.");
                 }
                 else
                 {
+                    _logger.LogWarning("Scraping request rejected - job already running for {Chain} on {Date}", chain, date);
                     return Conflict("Scraping job is already running. Only one job can run at a time.");
                 }
             }
 
             _queue.Enqueue(async ct =>
             {
-                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force);
-                // Optionally log result or send notification here
+                var result = await _scrapingJobService.RunScrapingJobAsync(chain, date.Value, ct, force, initiatedBy, RequestSource.API);
+                _logger.LogInformation("Queued scraping job completed: {Success}, Message: {Message}, Error: {Error}", 
+                    result.Success, result.Message, result.ErrorMessage);
             });
 
             return Accepted($"Scraping job for chain '{chain}' and date '{date.Value}' has been queued.");
@@ -120,14 +139,78 @@ namespace CijeneScraper.Controllers
         [HttpGet("status")]
         public async Task<IActionResult> GetStatus()
         {
-            var results = _dbContext.ScrapingJobs.Select(o => new
-            {
-                o.Chain,
-                o.Date,
-                o.CompletedAt
-            }).OrderByDescending(o => o.Date)
-            .Take(10);
+            var results = _dbContext.ScrapingJobs
+                .Include(j => j.Chain)
+                .Include(j => j.ScrapingJobLog)
+                .Select(o => new
+                {
+                    o.Id,
+                    Chain = o.Chain.Name,
+                    o.Date,
+                    o.StartedAt,
+                    o.CompletedAt,
+                    o.InitiatedBy,
+                    o.IsForced,
+                    o.PriceChanges,
+                    DetailedLog = o.ScrapingJobLog != null ? new
+                    {
+                        o.ScrapingJobLog.Status,
+                        o.ScrapingJobLog.StoresProcessed,
+                        o.ScrapingJobLog.ProductsFound,
+                        o.ScrapingJobLog.DurationMs,
+                        o.ScrapingJobLog.ErrorMessage
+                    } : null
+                }).OrderByDescending(o => o.StartedAt)
+                .Take(10);
+                
             return Ok(results);
+        }
+
+        /// <summary>
+        /// Retrieves detailed job logs with filtering options
+        /// </summary>
+        [HttpGet("logs")]
+        public async Task<IActionResult> GetJobLogs(
+            [FromQuery] string? chain = null,
+            [FromQuery] int take = 50,
+            CancellationToken cancellationToken = default)
+        {
+            var logs = await _jobLogService.GetRecentJobsAsync(chain, take, cancellationToken);
+            
+            var result = logs.Select(log => new
+            {
+                log.Id,
+                Chain = log.Chain.Name,
+                log.Date,
+                log.StartedAt,
+                log.CompletedAt,
+                log.Status,
+                log.InitiatedBy,
+                log.RequestSource,
+                log.IsForced,
+                log.StoresProcessed,
+                log.ProductsFound,
+                log.PriceChanges,
+                DurationSeconds = log.DurationMs.HasValue ? (double?)log.DurationMs.Value / 1000.0 : null,
+                log.SuccessMessage,
+                log.ErrorMessage
+            });
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Retrieves scraping job statistics
+        /// </summary>
+        [HttpGet("statistics")]
+        public async Task<IActionResult> GetStatistics(
+            [FromQuery] DateOnly? fromDate = null,
+            [FromQuery] DateOnly? toDate = null,
+            [FromQuery] string? chain = null,
+            CancellationToken cancellationToken = default)
+        {
+            var stats = await _jobLogService.GetStatisticsAsync(fromDate, toDate, chain, cancellationToken);
+            return Ok(stats);
         }
     }
 }

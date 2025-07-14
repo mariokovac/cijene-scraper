@@ -1,6 +1,7 @@
 using CijeneScraper.Crawler;
 using CijeneScraper.Data;
 using CijeneScraper.Data.Repository;
+using CijeneScraper.Extensions;
 using CijeneScraper.Models;
 using CijeneScraper.Services;
 using CijeneScraper.Services.Caching;
@@ -9,6 +10,7 @@ using CijeneScraper.Services.Crawlers.Chains.Kaufland;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.DataProcessor;
 using CijeneScraper.Services.Geocoding;
+using CijeneScraper.Services.Logging;
 using CijeneScraper.Services.Notification;
 using CijeneScraper.Services.Scrape;
 using CijeneScraper.Services.Security;
@@ -43,6 +45,17 @@ namespace CijeneScraper
                 )
             );
             builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+            // Add database logging
+            builder.Logging.AddDatabaseLogging(options =>
+            {
+                options.MinLevel = LogLevel.Information;
+                options.BufferSize = 50;
+                options.FlushIntervalSeconds = 15;
+            });
+
+            // Register logging services
+            builder.Services.AddScrapingJobLogging();
 
             // Register the geocoding service
             builder.Services.AddScoped<IGeocodingService, GeocodingService>();
@@ -116,7 +129,18 @@ namespace CijeneScraper
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                db.Database.Migrate();
+                try
+                {
+                    db.Database.Migrate();
+                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                    logger.LogInformation("Database migrations applied successfully");
+                }
+                catch (Exception ex)
+                {
+                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                    logger.LogError(ex, "Failed to apply database migrations");
+                    throw;
+                }
             }
 
             app.Run();

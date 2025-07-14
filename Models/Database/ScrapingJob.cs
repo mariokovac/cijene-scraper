@@ -18,9 +18,41 @@ namespace CijeneScraper.Models.Database
         [Required]
         public DateOnly Date { get; set; }
 
+        /// <summary>
+        /// When the scraping job was started
+        /// </summary>
+        public DateTime StartedAt { get; set; }
+
+        /// <summary>
+        /// When the scraping job was completed
+        /// </summary>
         public DateTime CompletedAt { get; set; }
+
+        /// <summary>
+        /// User or system that initiated the scraping
+        /// </summary>
+        [MaxLength(100)]
+        public string? InitiatedBy { get; set; }
+
+        /// <summary>
+        /// Whether this was a forced execution
+        /// </summary>
+        public bool IsForced { get; set; }
+
+        /// <summary>
+        /// Number of price changes detected during this job
+        /// </summary>
+        public int PriceChanges { get; set; }
+
+        /// <summary>
+        /// Reference to the detailed log entry
+        /// </summary>
+        public long? ScrapingJobLogId { get; set; }
 
         [ForeignKey(nameof(ChainID))]
         public virtual Chain Chain { get; set; } = null!;
+
+        [ForeignKey(nameof(ScrapingJobLogId))]
+        public virtual ScrapingJobLog? ScrapingJobLog { get; set; }
     }
 }
