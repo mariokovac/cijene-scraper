@@ -129,44 +129,56 @@ namespace CijeneScraper.Services.Scrape
                     // Update with final price changes
                     await _jobLogService.UpdateProgressAsync(jobLog.Id, priceChanges: changes, cancellationToken: cancellationToken);
 
-                    // load chain from database if not already done
-                    if (dbChain == null)
+                    // Only create/update ScrapingJob record if there were price changes (successful job with data)
+                    if (changes > 0)
                     {
-                        dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
-                    }
+                        // load chain from database if not already done
+                        if (dbChain == null)
+                        {
+                            dbChain = await _dbContext.Chains.FirstOrDefaultAsync(o => o.Name == c.Chain, cancellationToken);
+                        }
 
-                    // Create or update legacy ScrapingJob record
-                    var existingScrapingJob = await _dbContext.ScrapingJobs
-                        .FirstOrDefaultAsync(j => j.ChainID == dbChain!.Id && j.Date == date, cancellationToken);
+                        // Create or update legacy ScrapingJob record
+                        var existingScrapingJob = await _dbContext.ScrapingJobs
+                            .FirstOrDefaultAsync(j => j.ChainID == dbChain!.Id && j.Date == date, cancellationToken);
 
-                    if (existingScrapingJob != null)
-                    {
-                        // Update existing record
-                        existingScrapingJob.CompletedAt = DateTime.UtcNow;
-                        existingScrapingJob.InitiatedBy = initiatedBy;
-                        existingScrapingJob.IsForced = force;
-                        existingScrapingJob.PriceChanges = changes;
-                        existingScrapingJob.ScrapingJobLogId = jobLog.Id;
+                        if (existingScrapingJob != null)
+                        {
+                            // Update existing record
+                            existingScrapingJob.CompletedAt = DateTime.UtcNow;
+                            existingScrapingJob.InitiatedBy = initiatedBy;
+                            existingScrapingJob.IsForced = force;
+                            existingScrapingJob.PriceChanges = changes;
+                            existingScrapingJob.ScrapingJobLogId = jobLog.Id;
+                        }
+                        else
+                        {
+                            // Create new record
+                            var scrapingJob = new ScrapingJob
+                            {
+                                ChainID = dbChain!.Id,
+                                Date = date,
+                                StartedAt = jobLog.StartedAt,
+                                CompletedAt = DateTime.UtcNow,
+                                InitiatedBy = initiatedBy,
+                                IsForced = force,
+                                PriceChanges = changes,
+                                ScrapingJobLogId = jobLog.Id
+                            };
+
+                            _dbContext.ScrapingJobs.Add(scrapingJob);
+                        }
+
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                        
+                        _logger.LogInformation("ScrapingJob record created/updated for {Chain} on {Date} with {Changes} price changes", 
+                            c.Chain, date, changes);
                     }
                     else
                     {
-                        // Create new record
-                        var scrapingJob = new ScrapingJob
-                        {
-                            ChainID = dbChain!.Id,
-                            Date = date,
-                            StartedAt = jobLog.StartedAt,
-                            CompletedAt = DateTime.UtcNow,
-                            InitiatedBy = initiatedBy,
-                            IsForced = force,
-                            PriceChanges = changes,
-                            ScrapingJobLogId = jobLog.Id
-                        };
-
-                        _dbContext.ScrapingJobs.Add(scrapingJob);
+                        _logger.LogInformation("No price changes detected for {Chain} on {Date} - ScrapingJob record not created", 
+                            c.Chain, date);
                     }
-
-                    await _dbContext.SaveChangesAsync(cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     await c.ClearCacheAsync(outputFolder, date, cancellationToken);
