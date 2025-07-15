@@ -494,11 +494,11 @@ namespace CijeneScraper.Services.DataProcessor
                         row.ChainProductId,   // @p{paramIndex}
                         row.StoreId,          // @p{paramIndex + 1}
                         row.Date,             // @p{paramIndex + 2}
-                        row.MPC ?? (object?)DBNull.Value,              // @p{paramIndex + 3}
-                        row.PricePerUnit ?? (object?)DBNull.Value,     // @p{paramIndex + 4}
-                        row.SpecialPrice ?? (object?)DBNull.Value,     // @p{paramIndex + 5}
-                        row.BestPrice30 ?? (object?)DBNull.Value,      // @p{paramIndex + 6}
-                        row.AnchorPrice ?? (object?)DBNull.Value,      // @p{paramIndex + 7}
+                        row.MPC,              // @p{paramIndex + 3} - Use null instead of DBNull.Value
+                        row.PricePerUnit,     // @p{paramIndex + 4} - Use null instead of DBNull.Value
+                        row.SpecialPrice,     // @p{paramIndex + 5} - Use null instead of DBNull.Value
+                        row.BestPrice30,      // @p{paramIndex + 6} - Use null instead of DBNull.Value
+                        row.AnchorPrice,      // @p{paramIndex + 7} - Use null instead of DBNull.Value
                         row.CreatedAt         // @p{paramIndex + 8}
                     });
                 }
