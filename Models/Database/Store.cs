@@ -1,8 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Xml.Linq;
 
 namespace CijeneScraper.Models.Database
 {
+    [Index(nameof(ChainId), Name = "IX_Stores_ChainId")]
+    [Index(nameof(Code), nameof(ChainId), Name = "IX_Stores_Code_ChainId")]
     public class Store
     {
         [Key]

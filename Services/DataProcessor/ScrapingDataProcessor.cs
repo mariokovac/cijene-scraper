@@ -6,6 +6,7 @@ using CijeneScraper.Services.Geocoding;
 using CijeneScraper.Utility;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 
 namespace CijeneScraper.Services.DataProcessor
@@ -79,7 +80,7 @@ namespace CijeneScraper.Services.DataProcessor
 
                 // 5. Process prices
                 _logger.LogInformation("│   └─💲\t[5/5]\tProcessing prices for chain: {ChainName}", crawler.Chain);
-                changesCount = await ProcessPricesAsync(dbContext, chain, results, date, token);
+                changesCount = await ProcessPricesAsyncUltraFast(dbContext, chain, results, date, token);
 
                 _logger.LogInformation("│   └─✅\tCommiting transaction");
                 await transaction.CommitAsync(token);
@@ -308,6 +309,7 @@ namespace CijeneScraper.Services.DataProcessor
 
         /// <summary>
         /// Processes and updates price information for a chain, adding new prices or updating existing ones.
+        /// Optimized for large datasets with batch processing and minimal memory usage.
         /// </summary>
         /// <param name="dbContext">The database context.</param>
         /// <param name="chain">The chain entity.</param>
@@ -315,75 +317,213 @@ namespace CijeneScraper.Services.DataProcessor
         /// <param name="date">The date for which the prices are being processed.</param>
         /// <param name="token">A cancellation token.</param>
         /// <returns>The number of state entries written to the database.</returns>
+        [Obsolete]
         private async Task<int> ProcessPricesAsync(ApplicationDbContext dbContext, Chain chain, Dictionary<StoreInfo, List<PriceInfo>> results, DateOnly date, CancellationToken token)
         {
+            const int batchSize = 5000; // Increased batch size since we're only inserting
+
             var storeCodes = results.Keys.Select(s => s.Code).ToHashSet();
             var productCodes = results.Values.SelectMany(p => p.Select(pr => pr.ProductCode)).ToHashSet();
 
-            // Load existing stores for the chain
+            // Load existing stores and products with single optimized queries
             var existingStores = await dbContext.Stores
+                .AsNoTracking()
                 .Where(s => s.ChainId == chain.Id && storeCodes.Contains(s.Code))
-                .ToDictionaryAsync(s => s.Code, token);
+                .Select(s => new { s.Id, s.Code })
+                .ToDictionaryAsync(s => s.Code, s => s.Id, token);
 
-            // Load existing products for the chain
             var existingChainProducts = await dbContext.ChainProducts
+                .AsNoTracking()
                 .Where(cp => cp.ChainId == chain.Id && productCodes.Contains(cp.Code))
-                .ToDictionaryAsync(cp => cp.Code, token);
+                .Select(cp => new { cp.Id, cp.Code })
+                .ToDictionaryAsync(cp => cp.Code, cp => cp.Id, token);
 
-            // Load existing prices for the given date, stores, and products
-            var existingPrices = await dbContext.Prices
-                .Where(p => p.Store.ChainId == chain.Id &&
-                           storeCodes.Contains(p.Store.Code) &&
-                           productCodes.Contains(p.ChainProduct.Code) &&
-                           p.Date == date)
-                .Select(p => new { StoreCode = p.Store.Code, ProductCode = p.ChainProduct.Code, Price = p })
-                .ToDictionaryAsync(x => $"{x.StoreCode}_{x.ProductCode}", x => x.Price, token);
-
-            var newPrices = new List<Price>();
+            // Prepare all price entries for batch processing
+            var allPriceEntries = new List<Price>();
+            var skippedCount = 0;
 
             foreach (var storeInfo in results.Keys)
             {
-                var store = existingStores[storeInfo.Code];
+                if (!existingStores.TryGetValue(storeInfo.Code, out var storeId))
+                {
+                    skippedCount++;
+                    continue;
+                }
 
                 foreach (var priceInfo in results[storeInfo])
                 {
-                    var chainProduct = existingChainProducts[priceInfo.ProductCode];
-                    var priceKey = $"{store.Code}_{chainProduct.Code}";
+                    if (!existingChainProducts.TryGetValue(priceInfo.ProductCode, out var chainProductId))
+                    {
+                        skippedCount++;
+                        continue;
+                    }
 
-                    if (!existingPrices.TryGetValue(priceKey, out var existingPrice))
+                    allPriceEntries.Add(new Price
                     {
-                        // Add new price entry
-                        var newPrice = new Price
-                        {
-                            Store = store,
-                            ChainProduct = chainProduct,
-                            Date = date,
-                            MPC = priceInfo.Price,
-                            PricePerUnit = priceInfo.PricePerUnit,
-                            SpecialPrice = priceInfo.SpecialPrice,
-                            BestPrice30 = priceInfo.BestPrice30,
-                            AnchorPrice = priceInfo.AnchorPrice
-                        };
-                        newPrices.Add(newPrice);
-                    }
-                    else
-                    {
-                        // Update existing price entry
-                        existingPrice.MPC = priceInfo.Price;
-                        existingPrice.PricePerUnit = priceInfo.PricePerUnit;
-                        existingPrice.SpecialPrice = priceInfo.SpecialPrice;
-                        existingPrice.BestPrice30 = priceInfo.BestPrice30;
-                        existingPrice.AnchorPrice = priceInfo.AnchorPrice;
-                    }
+                        StoreId = storeId,
+                        ChainProductId = chainProductId,
+                        Date = date,
+                        MPC = priceInfo.Price,
+                        PricePerUnit = priceInfo.PricePerUnit,
+                        SpecialPrice = priceInfo.SpecialPrice,
+                        BestPrice30 = priceInfo.BestPrice30,
+                        AnchorPrice = priceInfo.AnchorPrice,
+                        CreatedAt = DateTime.UtcNow
+                    });
                 }
             }
 
-            if (newPrices.Any())
+            if (skippedCount > 0)
             {
-                dbContext.Prices.AddRange(newPrices);
+                _logger.LogWarning("│     ├─⚠️\tSkipped {SkippedCount} price entries due to missing stores or products", skippedCount);
             }
 
-            return await dbContext.SaveChangesAsync(token);
+            _logger.LogInformation("│     ├─📊\tPrepared {TotalEntries} price entries for bulk insert", allPriceEntries.Count);
+
+            if (allPriceEntries.Count == 0)
+            {
+                _logger.LogWarning("│     └─❌\tNo valid price entries to process");
+                return 0;
+            }
+
+            // Process in batches for better memory management and progress tracking
+            var totalChanges = 0;
+            var processedCount = 0;
+            var totalBatches = (allPriceEntries.Count + batchSize - 1) / batchSize;
+
+            for (int i = 0; i < allPriceEntries.Count; i += batchSize)
+            {
+                var batch = allPriceEntries.Skip(i).Take(batchSize).ToList();
+
+                // Bulk insert the batch
+                dbContext.Prices.AddRange(batch);
+                var batchChanges = await dbContext.SaveChangesAsync(token);
+
+                totalChanges += batchChanges;
+                processedCount += batch.Count;
+
+                _logger.LogInformation("│     ├─⚡\tProcessed batch {CurrentBatch}/{TotalBatches} ({ProcessedCount}/{TotalCount} entries, {BatchChanges} changes)",
+                    (i / batchSize) + 1, totalBatches, processedCount, allPriceEntries.Count, batchChanges);
+
+                // Clear change tracker to free memory after each batch
+                dbContext.ChangeTracker.Clear();
+
+                // Optional: Brief pause every 10 batches to allow other operations
+                if (i % (batchSize * 10) == 0 && i > 0)
+                {
+                    await Task.Delay(50, token);
+                }
+            }
+
+            _logger.LogInformation("│     └─✅\tCompleted price processing: {TotalChanges} total changes", totalChanges);
+            return totalChanges;
+        }
+
+        /// <summary>
+        /// Ultra-fast version using bulk insert with raw SQL, respecting PostgreSQL parameter limits
+        /// This is the recommended approach for cross-network scenarios
+        /// </summary>
+        private async Task<int> ProcessPricesAsyncUltraFast(ApplicationDbContext dbContext, Chain chain, Dictionary<StoreInfo, List<PriceInfo>> results, DateOnly date, CancellationToken token)
+        {
+            const int maxParametersPerStatement = 65000; // Leave some margin below 65535
+            const int parametersPerRow = 9; // ChainProductId, StoreId, Date, MPC, PricePerUnit, SpecialPrice, BestPrice30, AnchorPrice, CreatedAt
+            const int maxRowsPerBatch = maxParametersPerStatement / parametersPerRow; // ~7222 rows per batch
+
+            var storeCodes = results.Keys.Select(s => s.Code).ToHashSet();
+            var productCodes = results.Values.SelectMany(p => p.Select(pr => pr.ProductCode)).ToHashSet();
+
+            // Load stores and products
+            var existingStores = await dbContext.Stores
+                .AsNoTracking()
+                .Where(s => s.ChainId == chain.Id && storeCodes.Contains(s.Code))
+                .Select(s => new { s.Id, s.Code })
+                .ToDictionaryAsync(s => s.Code, s => s.Id, token);
+
+            var existingChainProducts = await dbContext.ChainProducts
+                .AsNoTracking()
+                .Where(cp => cp.ChainId == chain.Id && productCodes.Contains(cp.Code))
+                .Select(cp => new { cp.Id, cp.Code })
+                .ToDictionaryAsync(cp => cp.Code, cp => cp.Id, token);
+
+            // Prepare all price data first
+            var allPriceData = new List<(long ChainProductId, long StoreId, DateOnly Date, decimal? MPC, decimal? PricePerUnit, decimal? SpecialPrice, decimal? BestPrice30, decimal? AnchorPrice, DateTime CreatedAt)>();
+
+            foreach (var storeInfo in results.Keys)
+            {
+                if (!existingStores.TryGetValue(storeInfo.Code, out var storeId))
+                    continue;
+
+                foreach (var priceInfo in results[storeInfo])
+                {
+                    if (!existingChainProducts.TryGetValue(priceInfo.ProductCode, out var chainProductId))
+                        continue;
+
+                    allPriceData.Add((chainProductId, storeId, date, priceInfo.Price, priceInfo.PricePerUnit,
+                        priceInfo.SpecialPrice, priceInfo.BestPrice30, priceInfo.AnchorPrice, DateTime.UtcNow));
+                }
+            }
+
+            if (allPriceData.Count == 0)
+            {
+                _logger.LogWarning("│     └─❌\tNo valid price entries to process");
+                return 0;
+            }
+
+            _logger.LogInformation("│     ├─📊\tPrepared {TotalEntries} price entries for bulk insert in batches of {MaxRows}",
+                allPriceData.Count, maxRowsPerBatch);
+
+            var totalChanges = 0;
+            var processedCount = 0;
+            var totalBatches = (allPriceData.Count + maxRowsPerBatch - 1) / maxRowsPerBatch;
+
+            for (int i = 0; i < allPriceData.Count; i += maxRowsPerBatch)
+            {
+                var batch = allPriceData.Skip(i).Take(maxRowsPerBatch).ToList();
+
+                // Prepare batch SQL with parameters
+                var values = new List<string>();
+                var parameters = new List<object?>();
+
+                for (int j = 0; j < batch.Count; j++)
+                {
+                    var paramIndex = j * parametersPerRow;
+                    values.Add($"(@p{paramIndex}, @p{paramIndex + 1}, @p{paramIndex + 2}, @p{paramIndex + 3}, @p{paramIndex + 4}, @p{paramIndex + 5}, @p{paramIndex + 6}, @p{paramIndex + 7}, @p{paramIndex + 8})");
+
+                    var row = batch[j];
+                    parameters.AddRange(new object?[] {
+                        row.ChainProductId,   // @p{paramIndex}
+                        row.StoreId,          // @p{paramIndex + 1}
+                        row.Date,             // @p{paramIndex + 2}
+                        row.MPC ?? (object?)DBNull.Value,              // @p{paramIndex + 3}
+                        row.PricePerUnit ?? (object?)DBNull.Value,     // @p{paramIndex + 4}
+                        row.SpecialPrice ?? (object?)DBNull.Value,     // @p{paramIndex + 5}
+                        row.BestPrice30 ?? (object?)DBNull.Value,      // @p{paramIndex + 6}
+                        row.AnchorPrice ?? (object?)DBNull.Value,      // @p{paramIndex + 7}
+                        row.CreatedAt         // @p{paramIndex + 8}
+                    });
+                }
+
+                // Execute batch insert
+                var sql = $@"
+                    INSERT INTO ""Prices"" (""ChainProductId"", ""StoreId"", ""Date"", ""MPC"", ""PricePerUnit"", ""SpecialPrice"", ""BestPrice30"", ""AnchorPrice"", ""CreatedAt"")
+                    VALUES {string.Join(",", values)}";
+
+                var batchChanges = await dbContext.Database.ExecuteSqlRawAsync(sql, parameters.ToArray(), token);
+                totalChanges += batchChanges;
+                processedCount += batch.Count;
+
+                _logger.LogInformation("│     ├─⚡\tProcessed batch {CurrentBatch}/{TotalBatches} ({ProcessedCount}/{TotalCount} entries, {BatchChanges} changes)",
+                    (i / maxRowsPerBatch) + 1, totalBatches, processedCount, allPriceData.Count, batchChanges);
+
+                // Brief pause every 5 batches to allow other operations and reduce memory pressure
+                if (i % (maxRowsPerBatch * 5) == 0 && i > 0)
+                {
+                    await Task.Delay(50, token);
+                }
+            }
+
+            _logger.LogInformation("│     └─✅\tCompleted bulk insert: {TotalChanges} rows inserted in {TotalBatches} batches", totalChanges, totalBatches);
+            return totalChanges;
         }
     }
 }

@@ -16,6 +16,12 @@ namespace CijeneScraper.Models.Database
         IsUnique = true,
         Name = "UX_Prices_Product_Store_Date"
     )]
+
+    [Index(nameof(StoreId), Name = "IX_Prices_StoreId")]
+    [Index(nameof(ChainProductId), Name = "IX_Prices_ChainProductId")]
+
+    // Optimized DELETE
+    [Index(nameof(Date), nameof(StoreId), Name = "IX_Prices_Date_StoreId")]
     #endregion
     public class Price
     {
