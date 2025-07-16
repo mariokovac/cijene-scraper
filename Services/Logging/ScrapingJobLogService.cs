@@ -81,12 +81,8 @@ namespace CijeneScraper.Services.Logging
         {
             try
             {
-                // Get chain ID
-                var chain = await _dbContext.Chains.FirstOrDefaultAsync(c => c.Name == chainName, cancellationToken);
-                if (chain == null)
-                {
-                    throw new ArgumentException($"Chain '{chainName}' not found", nameof(chainName));
-                }
+                // Get or create chain
+                var chain = await GetOrCreateChainAsync(chainName, cancellationToken);
 
                 var jobLog = new ScrapingJobLog
                 {
@@ -112,6 +108,35 @@ namespace CijeneScraper.Services.Logging
                 _logger.LogError(ex, "Failed to start scraping job log for chain {ChainName} on {Date}", chainName, date);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Gets an existing chain by name or creates a new one if it doesn't exist.
+        /// </summary>
+        /// <param name="chainName">Name of the chain.</param>
+        /// <param name="cancellationToken">Token to cancel the operation.</param>
+        /// <returns>The existing or newly created Chain entity.</returns>
+        private async Task<Chain> GetOrCreateChainAsync(string chainName, CancellationToken cancellationToken = default)
+        {
+            var chain = await _dbContext.Chains.FirstOrDefaultAsync(c => c.Name == chainName, cancellationToken);
+            
+            if (chain == null)
+            {
+                _logger.LogInformation("Chain '{ChainName}' not found, creating new chain", chainName);
+                
+                chain = new Chain 
+                { 
+                    Name = chainName,
+                    CreatedAt = DateTime.UtcNow
+                };
+                
+                _dbContext.Chains.Add(chain);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                
+                _logger.LogInformation("Created new chain '{ChainName}' with ID {ChainId}", chainName, chain.Id);
+            }
+
+            return chain;
         }
 
         public async Task UpdateProgressAsync(long jobLogId, int? storesProcessed = null, int? productsFound = null, 

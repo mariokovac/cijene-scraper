@@ -8,7 +8,7 @@ POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland?force=true
 Accept: application/json
 ###
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/*
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/plodine
 Accept: application/json
 ###
 
