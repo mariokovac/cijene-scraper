@@ -200,7 +200,9 @@ namespace CijeneScraper.Services.Scrape
 
                     try
                     {
-                        await _emailService.SendAsync(
+                        if (changes > 0)
+                        {
+                            await _emailService.SendAsync(
                             $"Scraping completed for [{c.Chain} - {date:yyyy-MM-dd}]",
                             $"The scraping job for chain '{c.Chain}' on date {date:yyyy-MM-dd} has completed successfully.\n\r" +
                             $"Job Log ID: {jobLog.Id}\n\r" +
@@ -210,6 +212,7 @@ namespace CijeneScraper.Services.Scrape
                             $"Products found: {results.Values.SelectMany(p => p).Count()}\n\r" +
                             $"Price changes detected: {changes}\n\r"
                         );
+                        }
                     }
                     catch (SmtpException smtpEx)
                     {
