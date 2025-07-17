@@ -1,4 +1,5 @@
-using CijeneScraper.Models.Crawler;
+Ôªøusing CijeneScraper.Models.Crawler;
+using CijeneScraper.Services.Crawlers.Common;
 using CijeneScraper.Utility;
 using CsvHelper.Configuration.Attributes;
 using System.Globalization;
@@ -7,53 +8,53 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
 {
     /// <summary>
     /// Represents a CSV record from Spar price lists.
-    /// CSV format: "naziv;öifra;marka;neto koli?ina;jedinica mjere;MPC (EUR);cijena za jedinicu mjere (EUR);MPC za vrijeme posebnog oblika prodaje (EUR);Najniûa cijena u posljednjih 30 dana (EUR);sidrena cijena na 2.5.2025. (EUR);barkod;kategorija proizvoda"
+    /// CSV format: "naziv;≈°ifra;marka;neto koliƒçina;jedinica mjere;MPC (EUR);cijena za jedinicu mjere (EUR);MPC za vrijeme posebnog oblika prodaje (EUR);Najni≈æa cijena u posljednjih 30 dana (EUR);sidrena cijena na 2.5.2025. (EUR);barkod;kategorija proizvoda"
     /// </summary>
-    public class SparCsvRecord
+    public class SparCsvRecord : CsvRecordBase
     {
         [Name("naziv")]
         [Index(0)]
-        public string Product { get; set; } = string.Empty;
+        public override string Product { get; set; } = string.Empty;
 
-        [Name("öifra")]
+        [Name("≈°ifra")]
         [Index(1)]
-        public string ProductCode { get; set; } = string.Empty;
+        public override string ProductCode { get; set; } = string.Empty;
 
         [Name("marka")]
         [Index(2)]
-        public string Brand { get; set; } = string.Empty;
+        public override string Brand { get; set; } = string.Empty;
 
-        [Name("neto koli?ina")]
+        [Name("neto koliƒçina")]
         [Index(3)]
-        public string Quantity { get; set; } = string.Empty;
+        public override string Quantity { get; set; } = string.Empty;
 
         [Name("jedinica mjere")]
         [Index(4)]
-        public string UOM { get; set; } = string.Empty;
+        public override string UOM { get; set; } = string.Empty;
 
         [Name("MPC (EUR)")]
         [Index(5)]
-        public string Price { get; set; } = string.Empty;
+        public override string Price { get; set; } = string.Empty;
 
         [Name("cijena za jedinicu mjere (EUR)")]
         [Index(6)]
-        public string PricePerUnit { get; set; } = string.Empty;
+        public override string PricePerUnit { get; set; } = string.Empty;
 
         [Name("MPC za vrijeme posebnog oblika prodaje (EUR)")]
         [Index(7)]
-        public string SpecialPrice { get; set; } = string.Empty;
+        public override string SpecialPrice { get; set; } = string.Empty;
 
-        [Name("Najniûa cijena u posljednjih 30 dana (EUR)")]
+        [Name("Najni≈æa cijena u posljednjih 30 dana (EUR)")]
         [Index(8)]
-        public string BestPrice30 { get; set; } = string.Empty;
+        public override string BestPrice30 { get; set; } = string.Empty;
 
         [Name("sidrena cijena na 2.5.2025. (EUR)")]
         [Index(9)]
-        public string AnchorPrice { get; set; } = string.Empty;
+        public override string AnchorPrice { get; set; } = string.Empty;
 
         [Name("barkod")]
         [Index(10)]
-        public string Barcode { get; set; } = string.Empty;
+        public override string Barcode { get; set; } = string.Empty;
 
         [Name("kategorija proizvoda")]
         [Index(11)]
@@ -64,21 +65,21 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
             NumberDecimalSeparator = ","
         };
 
-        public static explicit operator PriceInfo(SparCsvRecord p)
+        public override PriceInfo ToPriceInfo()
         {
             return new PriceInfo
             {
-                ProductCode = p.ProductCode,
-                Barcode = p.Barcode.NormalizeBarcode(p.ProductCode),
-                Name = p.Product.Trim(),
-                Price = decimal.TryParse(p.Price, NumberStyles.Any, NumberFormatInfo, out var price) ? price : (decimal?)null,
-                Brand = p.Brand?.Trim(),
-                UOM = p.UOM?.Trim(),
-                Quantity = p.Quantity?.Trim(),
-                PricePerUnit = decimal.TryParse(p.PricePerUnit, NumberStyles.Any, NumberFormatInfo, out var unitPrice) ? unitPrice : (decimal?)null,
-                SpecialPrice = decimal.TryParse(p.SpecialPrice, NumberStyles.Any, NumberFormatInfo, out var specialPrice) ? specialPrice : (decimal?)null,
-                BestPrice30 = decimal.TryParse(p.BestPrice30, NumberStyles.Any, NumberFormatInfo, out var bestPrice30) ? bestPrice30 : (decimal?)null,
-                AnchorPrice = decimal.TryParse(p.AnchorPrice, NumberStyles.Any, NumberFormatInfo, out var anchorPrice) ? anchorPrice : (decimal?)null
+                ProductCode = ProductCode,
+                Barcode = Barcode.NormalizeBarcode(ProductCode),
+                Name = Product.Trim(),
+                Price = decimal.TryParse(Price, NumberStyles.Any, NumberFormatInfo, out var price) ? price : (decimal?)null,
+                Brand = Brand?.Trim(),
+                UOM = UOM?.Trim(),
+                Quantity = Quantity?.Trim(),
+                PricePerUnit = decimal.TryParse(PricePerUnit, NumberStyles.Any, NumberFormatInfo, out var unitPrice) ? unitPrice : (decimal?)null,
+                SpecialPrice = decimal.TryParse(SpecialPrice, NumberStyles.Any, NumberFormatInfo, out var specialPrice) ? specialPrice : (decimal?)null,
+                BestPrice30 = decimal.TryParse(BestPrice30, NumberStyles.Any, NumberFormatInfo, out var bestPrice30) ? bestPrice30 : (decimal?)null,
+                AnchorPrice = decimal.TryParse(AnchorPrice, NumberStyles.Any, NumberFormatInfo, out var anchorPrice) ? anchorPrice : (decimal?)null
             };
         }
     }

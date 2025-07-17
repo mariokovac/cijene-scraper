@@ -1,8 +1,5 @@
-namespace CijeneScraper.Services.Crawlers.Chains.Spar
+namespace CijeneScraper.Services.Crawlers.Common
 {
-    /// <summary>
-    /// Data transfer object representing store information scraped from Spar.
-    /// </summary>
     public class StoreInfoDto
     {
         /// <summary>
@@ -34,5 +31,15 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
         /// City where the store is located.
         /// </summary>
         public string City { get; set; } = string.Empty;
+
+        public override bool Equals(object? obj)
+        {
+            return obj is StoreInfoDto other && StoreId == other.StoreId;
+        }
+
+        public override int GetHashCode()
+        {
+            return StoreId.GetHashCode();
+        }
     }
 }

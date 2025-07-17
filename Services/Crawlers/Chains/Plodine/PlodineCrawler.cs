@@ -3,6 +3,7 @@ using CijeneScraper.Models.Crawler;
 using CijeneScraper.Models.Database;
 using CijeneScraper.Services.Caching;
 using CijeneScraper.Services.Crawlers.Chains.Kaufland;
+using CijeneScraper.Services.Crawlers.Common;
 using CsvHelper.Configuration;
 using HtmlAgilityPack;
 using System.Globalization;
@@ -173,7 +174,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Plodine
                     }
 
                     // Add the store and products to the result dictionary
-                    TransformToResult(result, storeInfo, products);
+                    transformToResult(result, storeInfo, products);
 
                     _logger.LogInformation($"Read {products.Count} products for store {storeInfo.StoreId}");
                     if (onStoreProcessed != null)
@@ -187,29 +188,6 @@ namespace CijeneScraper.Services.Crawlers.Chains.Plodine
 
             _logger.LogInformation($"Crawled {result.Count} stores for {date:yyyy-MM-dd}");
             return result;
-        }
-
-        /// <summary>
-        /// Adds the store and its products to the result dictionary.
-        /// </summary>
-        /// <param name="result">The result dictionary to populate.</param>
-        /// <param name="store">Store information DTO.</param>
-        /// <param name="products">List of products for the store.</param>
-        private void TransformToResult(Dictionary<StoreInfo, List<PriceInfo>> result,
-            StoreInfoDto store, List<PlodineCsvRecord> products)
-        {
-            result.Add(
-                new StoreInfo
-                {
-                    Chain = CHAIN,
-                    Code = store.StoreId,
-                    Name = store.Name,
-                    StreetAddress = store.StreetAddress,
-                    PostalCode = store.Zipcode,
-                    City = store.City
-                },
-                products.Select(p => (PriceInfo)p).ToList()
-            );
         }
 
         /// <summary>

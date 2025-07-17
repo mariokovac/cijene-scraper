@@ -1,6 +1,7 @@
 ﻿using CijeneScraper.Crawler;
 using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Services.Crawlers.Common;
 using CsvHelper.Configuration;
 using System.Globalization;
 using System.Text;
@@ -188,29 +189,6 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
 
             _logger.LogInformation($"Crawled {result.Count} stores for {date:yyyy-MM-dd}");
             return result;
-        }
-
-        /// <summary>
-        /// Transforms the list of SparCsvRecord products into PriceInfo and adds them to the result dictionary for the given store.
-        /// </summary>
-        /// <param name="result">The result dictionary to populate.</param>
-        /// <param name="store">The store information DTO.</param>
-        /// <param name="products">The list of products for the store.</param>
-        private void transformToResult(Dictionary<StoreInfo, List<PriceInfo>> result,
-            StoreInfoDto store, List<SparCsvRecord> products)
-        {
-            result.Add(
-                new StoreInfo
-                {
-                    Chain = CHAIN,
-                    Code = store.StoreId,
-                    Name = store.Name,
-                    StreetAddress = store.StreetAddress,
-                    PostalCode = store.Zipcode,
-                    City = store.City
-                },
-                products.Select(p => (PriceInfo)p).ToList()
-            );
         }
 
         /// <summary>

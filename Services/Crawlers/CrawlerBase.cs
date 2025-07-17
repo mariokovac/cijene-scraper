@@ -1,6 +1,7 @@
 ﻿using CijeneScraper.Controllers;
 using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Services.Crawlers.Common;
 using CijeneScraper.Utility;
 using CsvHelper;
 using CsvHelper.Configuration;
@@ -172,6 +173,25 @@ namespace CijeneScraper.Crawler
             }
 
             return uniqueRecords.Values.ToList();
+        }
+
+        
+        protected virtual void transformToResult<T>(Dictionary<StoreInfo, List<PriceInfo>> result,
+            StoreInfoDto store, List<T> products)
+            where T : CsvRecordBase
+        {
+            result.Add(
+                new StoreInfo
+                {
+                    Chain = Chain,
+                    Code = store.StoreId,
+                    Name = store.Name,
+                    StreetAddress = store.StreetAddress,
+                    PostalCode = store.Zipcode,
+                    City = store.City
+                },
+                products.Select(p => p.ToPriceInfo()).ToList()
+            );
         }
     }
 }

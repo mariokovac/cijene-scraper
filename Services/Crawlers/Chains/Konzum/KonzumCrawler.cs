@@ -1,6 +1,7 @@
 ﻿using CijeneScraper.Crawler;
 using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
+using CijeneScraper.Services.Crawlers.Common;
 using HtmlAgilityPack;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Globalization;
@@ -187,29 +188,6 @@ namespace CijeneScraper.Services.Crawlers.Chains.Konzum
 
             _logger.LogInformation($"Crawled {result.Count} stores for {date:yyyy-MM-dd}");
             return result;
-        }
-
-        /// <summary>
-        /// Adds the store and its products to the result dictionary.
-        /// </summary>
-        /// <param name="result">The result dictionary to populate.</param>
-        /// <param name="store">Store information DTO.</param>
-        /// <param name="products">List of products for the store.</param>
-        private void transformToResult(Dictionary<StoreInfo, List<PriceInfo>> result,
-            StoreInfoDto store, List<KonzumCsvRecord> products)
-        {
-            result.Add(
-                new StoreInfo
-                {
-                    Chain = CHAIN,
-                    Code = store.StoreId,
-                    Name = store.Name,
-                    StreetAddress = store.StreetAddress,
-                    PostalCode = store.Zipcode,
-                    City = store.City
-                },
-                products.Select(p => (PriceInfo)p).ToList()
-            );
         }
 
         /// <summary>

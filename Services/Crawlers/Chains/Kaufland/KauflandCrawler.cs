@@ -2,6 +2,7 @@ using CijeneScraper.Crawler;
 using CijeneScraper.Models.Crawler;
 using CijeneScraper.Services.Caching;
 using CijeneScraper.Services.Crawlers.Chains.Konzum;
+using CijeneScraper.Services.Crawlers.Common;
 using CsvHelper.Configuration;
 using HtmlAgilityPack;
 using System.Globalization;
