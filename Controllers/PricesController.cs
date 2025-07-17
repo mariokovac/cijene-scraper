@@ -246,6 +246,7 @@ namespace CijeneScraper.Controllers
 
         /// <summary>
         /// Returns prices for specified product codes from stores within a given radius of the provided GPS coordinates.
+        /// Returns at most one store per chain (the closest one) within the specified radius.
         /// </summary>
         /// <param name="codes">Required. List of product codes (Product.Id) to search for.</param>
         /// <param name="latitude">Required. Latitude of the search center.</param>
@@ -253,7 +254,7 @@ namespace CijeneScraper.Controllers
         /// <param name="radiusKm">Optional. Search radius in kilometers. Default is 5.0.</param>
         /// <param name="cancellationToken">Cancellation token for the async operation.</param>
         /// <returns>
-        /// 200 OK with a list of <see cref="PriceNearby"/> ordered by distance.
+        /// 200 OK with a list of <see cref="PriceNearby"/> ordered by distance, with at most one store per chain.
         /// 400 Bad Request if codes are not provided.
         /// </returns>
         [HttpGet("ByCodesNearby")]
@@ -274,7 +275,10 @@ namespace CijeneScraper.Controllers
             // This part of the query is executed in-memory after fetching all stores,
             // as distance calculation cannot be translated to SQL by default.
             // For larger datasets, consider a database with spatial support (e.g., PostGIS).
-            var allStores = await _context.Stores.AsNoTracking().ToListAsync(cancellationToken);
+            var allStores = await _context.Stores
+                .Include(s => s.Chain)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
 
             // Geocode stores with missing coordinates
             foreach (var store in allStores.Where(s => (s.Latitude == 0 || s.Longitude == 0) && !string.IsNullOrWhiteSpace(s.Address)))
@@ -290,17 +294,25 @@ namespace CijeneScraper.Controllers
             }
             await _context.SaveChangesAsync(cancellationToken);
 
+            // Calculate distances and filter by radius
             var nearbyStores = allStores
                 .Select(s => new
                 {
                     StoreId = s.Id,
+                    ChainName = s.Chain.Name,
                     Distance = GeoHelpers.CalculateDistance(latitude, longitude, s.Latitude, s.Longitude)
                 })
                 .Where(s => s.Distance <= radiusKm)
                 .OrderBy(s => s.Distance)
                 .ToList();
 
-            var nearbyStoreIds = nearbyStores.Select(s => s.StoreId).ToList();
+            // Group by chain and select the closest store for each chain
+            var closestStorePerChain = nearbyStores
+                .GroupBy(s => s.ChainName)
+                .Select(g => g.OrderBy(s => s.Distance).First())
+                .ToList();
+
+            var nearbyStoreIds = closestStorePerChain.Select(s => s.StoreId).ToList();
             if (nearbyStoreIds.Count == 0)
             {
                 return Ok(new List<PriceNearby>());
@@ -323,7 +335,7 @@ namespace CijeneScraper.Controllers
                 .ToListAsync(cancellationToken);
 
             var result = prices
-                .Join(nearbyStores,
+                .Join(closestStorePerChain,
                       priceInfo => priceInfo.StoreId,
                       storeInfo => storeInfo.StoreId,
                       (priceInfo, storeInfo) => new PriceNearby
