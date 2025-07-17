@@ -4,7 +4,7 @@ POST {{cijene_scraper_HostAddress}}/api/scraper/start/konzum
 Accept: application/json
 ###
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/kaufland?force=true
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/spar?force=true
 Accept: application/json
 ###
 

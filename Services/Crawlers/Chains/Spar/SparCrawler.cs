@@ -268,6 +268,7 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
         /// <summary>
         /// Parses store information from the given CSV URL.
         /// Expected format: hipermarket_zadar_bleiburskih_zrtava_18_8701_interspar_zadar_0077_20250717_0330.csv
+        /// Uses regex pattern to extract: store_type, city_and_address, store_id, store_name
         /// </summary>
         /// <param name="url">The URL of the CSV file.</param>
         /// <returns>StoreInfoDto containing parsed store information.</returns>
@@ -277,50 +278,31 @@ namespace CijeneScraper.Services.Crawlers.Chains.Spar
             var uri = new Uri(url);
             var fileName = Path.GetFileNameWithoutExtension(uri.Segments.LastOrDefault() ?? string.Empty);
             
-            // Split the filename by underscores
-            var parts = fileName.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            // Regex pattern to match: store_type_city_address_store_id_store_name_...
+            // Pattern: ^([a-zA-Z]+)_([a-zA-Z0-9_\.]+)_(\d{4,5})_([a-zA-Z_]+)_
+            var addressPattern = new Regex(@"^([a-zA-Z]+)_([a-zA-Z0-9_\.]+)_(\d{4,5})_([a-zA-Z_]+)_", RegexOptions.Compiled);
             
-            if (parts.Length < 6)
+            var match = addressPattern.Match(fileName);
+            if (!match.Success)
                 throw new FormatException($"Invalid filename format: {fileName}");
-
-            // Extract store type (first part)
-            var storeType = parts[0];
             
-            // Find the store ID (should be 4 digits)
-            var storeIdIndex = -1;
-            for (int i = 0; i < parts.Length; i++)
-            {
-                if (Regex.IsMatch(parts[i], @"^\d{4}$"))
-                {
-                    storeIdIndex = i;
-                    break;
-                }
-            }
+            var storeType = match.Groups[1].Value;
+            var cityAndAddress = match.Groups[2].Value;
+            var storeId = match.Groups[3].Value;
+            var storeName = match.Groups[4].Value;
             
-            if (storeIdIndex == -1)
-                throw new FormatException($"Could not find store ID in filename: {fileName}");
-            
-            var storeId = parts[storeIdIndex];
-            
-            // Extract city (part right after store type)
-            var city = parts[1];
-            
-            // Extract street address (parts between city and store ID)
-            var streetParts = parts.Skip(2).Take(storeIdIndex - 2).ToArray();
-            var streetAddress = string.Join(" ", streetParts);
-            
-            // Clean up the address format
-            if (streetAddress.Contains("_"))
-            {
-                streetAddress = streetAddress.Replace("_", " ");
-            }
+            // Parse city and address from the cityAndAddress part
+            var cityAndAddressParts = cityAndAddress.Split('_');
+            var city = cityAndAddressParts[0]; // First part is always the city
+            var addressParts = cityAndAddressParts.Skip(1).ToArray(); // Rest is the address
+            var streetAddress = string.Join(" ", addressParts);
             
             return new StoreInfoDto
             {
                 StoreId = storeId,
                 StoreType = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(storeType),
                 Name = $"{CHAIN} {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(city)}",
-                StreetAddress = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(streetAddress),
+                StreetAddress = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(streetAddress.Replace("_", " ")),
                 Zipcode = string.Empty, // Not available in filename
                 City = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(city)
             };
