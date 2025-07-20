@@ -326,10 +326,6 @@ curl http://localhost:8080/health
 # Očekivani odgovor: "OK"
 ```
 
-## 📱 Mobile aplikacija
-
-Mobile aplikacija se nalazi u `mobile_app/` direktoriju. Koristi ovaj API kao backend.
-
 ## 📄 Licenca
 
 Ovaj projekt je licenciran pod MIT licencom. Pogledajte [LICENSE.txt](LICENSE.txt) za više informacija.
