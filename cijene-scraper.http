@@ -8,7 +8,7 @@ POST {{cijene_scraper_HostAddress}}/api/scraper/start/spar?force=true
 Accept: application/json
 ###
 
-POST {{cijene_scraper_HostAddress}}/api/scraper/start/spar
+POST {{cijene_scraper_HostAddress}}/api/scraper/start/lidl
 Accept: application/json
 ###
 

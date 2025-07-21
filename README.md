@@ -13,10 +13,11 @@ ASP.NET Core Web API projekt za scraping i pohranu cijena proizvoda iz maloproda
 
 ### Maloprodajni lanci
 Trenutno podržava sljedeće lance:
-- **Konzum** - CSV datoteke s cenikom
-- **Kaufland** - CSV datoteke s cenikom
-- **Plodine** - CSV datoteke s cenikom
-- **Spar** - CSV datoteke s cenikom
+- **Konzum** - CSV datoteke s cjenikom
+- **Kaufland** - CSV datoteke s cjenikom
+- **Plodine** - CSV datoteke s cjenikom
+- **Spar** - CSV datoteke s cjenikom
+- **Lidl** - ZIP datoteke s CSV cjenicima
 
 ### Napredne funkcionalnosti
 - **Geolokacija trgovina** - Google Geocoding API integracija
@@ -49,7 +50,7 @@ Trenutno podržava sljedeće lance:
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - [Docker](https://www.docker.com/) i [Docker Compose](https://docs.docker.com/compose/) (za Docker pokretanje)
-- [PostgreSQL](https://www.postgresql.org/) (ako pokretate izvan Dockera)
+- [PostgreSQL](https://www.postgresql.org/) (ako pokrećete izvan Dockera)
 - **Google Geocoding API ključ** (opcionalno, za geolokaciju trgovina)
 
 ## 🔧 Instalacija
@@ -174,7 +175,7 @@ Za automatsko geocodiranje adresa trgovina:
 
 ## 🔧 Dodavanje novog lanca
 
-1. **Stvori novo CSV record klasu**:
+1. **Stvori novu CSV record klasu**:
 ```csharp
 public class NoviLanacCsvRecord : CsvRecordBase
 {

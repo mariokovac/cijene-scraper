@@ -18,7 +18,7 @@ X-API-Key: vaš-api-klju?
 http://localhost:8080
 ```
 
-## ?? Health Check
+## ? Health Check
 
 ### GET /health
 
@@ -31,7 +31,7 @@ OK
 
 ---
 
-## ?? Scraper endpoints
+## ??? Scraper endpoints
 
 ### POST /api/scraper/start/{chain}
 
@@ -39,7 +39,7 @@ Pokretanje scraping posla za odre?eni lanac.
 
 **Parametri:**
 - `chain` (path, obavezno): Naziv lanca
-  - Podržani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `*` (svi lanci)
+  - Podržani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `lidl`, `*` (svi lanci)
 - `date` (query, opcionalno): Datum u formatu `YYYY-MM-DD`. Default: danas
 - `force` (query, opcionalno): Prisilno pokretanje (prekida postoje?i posao). Default: `false`
 
@@ -51,7 +51,7 @@ POST /api/scraper/start/*?force=true
 ```
 
 **Odgovori:**
-- **202 Accepted**: Posao je uspješno uvrsten u red
+- **202 Accepted**: Posao je uspješno uvršten u red
 - **409 Conflict**: Scraping posao ve? je pokrenut
 
 ### GET /api/scraper/status
@@ -198,7 +198,7 @@ GET /api/prices/CheapestLocation?barcode=1234567890123
 
 ### GET /api/prices/ByProductNamesGrouped
 
-Cijene grupiranje po lancima i nazivima proizvoda.
+Cijene grupirane po lancima i nazivima proizvoda.
 
 **Parametri:**
 - `productNames` (query, obavezno): Lista naziva proizvoda za pretraživanje
@@ -388,14 +388,14 @@ Sve cijene su u decimalnom formatu s to?kom kao separatorom:
 
 ## ?? Swagger UI
 
-Za interaktivno testiranje svih endpoint-ova, posjetite:
+Za interaktivno testiranje svih endpointova, posjetite:
 
 ```
 http://localhost:8080/swagger
 ```
 
 Swagger UI omogu?uje:
-- Pregled svih dostupnih endpoint-ova
+- Pregled svih dostupnih endpointova
 - Testiranje API poziva direktno iz browsera
 - Automatska generacija zahtjeva
 - Prikaz schematizma odgovora
@@ -513,14 +513,14 @@ def get_cheapest_location(barcode, scrape_date=None):
 
 ---
 
-## ? Performance savjeti
+## ?? Performance savjeti
 
 ### Optimizacija zahtjeva
 
 1. **Koristite paginaciju**: Postavite razuman `take` parametar
 2. **Filtrirajte po datumu**: Specificirajte to?ne datume umjesto širokih raspona
 3. **Cache rezultate**: API ne implementira vlastiti cache, dodajte ga na klijentskoj strani
-4. **Batch zahtjevi**: Koristite endpoint-ove koji vra?aju više podataka odjednom
+4. **Batch zahtjevi**: Koristite endpointove koji vra?aju više podataka odjednom
 
 ### Rate limiting
 
@@ -532,7 +532,7 @@ Trenutno nema implementiran rate limiting, ali preporu?uje se:
 ### Monitoring
 
 Pratite:
-- Response vrijeme endpoint-ova
+- Response vrijeme endpointova
 - Success rate API poziva
 - Availability Swagger UI-ja na `/swagger`
 - Health check status na `/health`
