@@ -1,24 +1,24 @@
-# API Dokumentacija
+﻿# API Dokumentacija
 
-Detaljni vodi? za kori�tenje Cijene Scraper API-ja.
+Detaljni vodič za korištenje Cijene Scraper API-ja.
 
-## ?? Autentifikacija
+## 🔑 Autentifikacija
 
-API koristi API klju?eve za autentifikaciju. Dodajte klju? u header:
+API koristi API ključeve za autentifikaciju. Dodajte ključ u header:
 
 ```http
-X-API-Key: va�-api-klju?
+X-API-Key: vaš-api-ključ
 ```
 
-**Napomena**: Ako je `ApiKey:Enabled` postavljen na `false` u konfiguraciji, autentifikacija se preska?e.
+**Napomena**: Ako je `ApiKey:Enabled` postavljen na `false` u konfiguraciji, autentifikacija se preskače.
 
-## ?? Base URL
+## 🌐 Base URL
 
 ```
 http://localhost:8080
 ```
 
-## ? Health Check
+## ✅ Health Check
 
 ### GET /health
 
@@ -31,17 +31,17 @@ OK
 
 ---
 
-## ??? Scraper endpoints
+## 🛠️ Scraper endpoints
 
 ### POST /api/scraper/start/{chain}
 
-Pokretanje scraping posla za odre?eni lanac.
+Pokretanje scraping posla za određeni lanac.
 
 **Parametri:**
 - `chain` (path, obavezno): Naziv lanca
-  - Podr�ani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `lidl`, `*` (svi lanci)
+  - Podržani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `lidl`, `*` (svi lanci)
 - `date` (query, opcionalno): Datum u formatu `YYYY-MM-DD`. Default: danas
-- `force` (query, opcionalno): Prisilno pokretanje (prekida postoje?i posao). Default: `false`
+- `force` (query, opcionalno): Prisilno pokretanje (prekida postojeći posao). Default: `false`
 
 **Primjeri:**
 ```http
@@ -51,12 +51,12 @@ POST /api/scraper/start/*?force=true
 ```
 
 **Odgovori:**
-- **202 Accepted**: Posao je uspje�no uvr�ten u red
-- **409 Conflict**: Scraping posao ve? je pokrenut
+- **202 Accepted**: Posao je uspješno uvršten u red
+- **409 Conflict**: Scraping posao već je pokrenut
 
 ### GET /api/scraper/status
 
-Dohva?anje statusa najnovijih scraping poslova.
+Dohvaćanje statusa najnovijih scraping poslova.
 
 **Odgovor:**
 ```json
@@ -83,7 +83,7 @@ Dohva?anje statusa najnovijih scraping poslova.
 
 ### GET /api/scraper/logs
 
-Dohva?anje detaljnih logova scraping poslova.
+Dohvaćanje detaljnih logova scraping poslova.
 
 **Parametri:**
 - `chain` (query, opcionalno): Filtriranje po lancu
@@ -105,11 +105,11 @@ Statistike scraping poslova.
 
 ---
 
-## ?? Price endpoints
+## 💰 Price endpoints
 
 ### GET /api/prices
 
-Dohva?anje cijena s filtriranjem.
+Dohvaćanje cijena s filtriranjem.
 
 **Parametri:**
 - `dates` (query, obavezno): Niz datuma u formatu `YYYY-MM-DD`
@@ -137,7 +137,7 @@ GET /api/prices?dates=2025-01-15&dates=2025-01-16&take=50&chain=konzum
 
 ### GET /api/prices/ByBarcode
 
-Cijene proizvoda po barkodu za odre?eni dan.
+Cijene proizvoda po barkodu za određeni dan.
 
 **Parametri:**
 - `barcode` (query, obavezno): Barkod proizvoda
@@ -170,7 +170,7 @@ GET /api/prices/ByBarcode?barcode=1234567890123&date=2025-01-15
 
 ### GET /api/prices/CheapestLocation
 
-Pronala�enje najjeftinijih lokacija za proizvod.
+Pronalaženje najjeftinijih lokacija za proizvod.
 
 **Parametri:**
 - `barcode` (query, obavezno): Barkod proizvoda
@@ -201,7 +201,7 @@ GET /api/prices/CheapestLocation?barcode=1234567890123
 Cijene grupirane po lancima i nazivima proizvoda.
 
 **Parametri:**
-- `productNames` (query, obavezno): Lista naziva proizvoda za pretra�ivanje
+- `productNames` (query, obavezno): Lista naziva proizvoda za pretraživanje
 - `city` (query, opcionalno): Filtriranje po gradu
 
 **Primjer:**
@@ -245,8 +245,8 @@ Cijene proizvoda u blizini GPS koordinata.
 
 **Parametri:**
 - `codes` (query, obavezno): Lista Product.Id-jeva
-- `latitude` (query, obavezno): Geografska �irina
-- `longitude` (query, obavezno): Geografska du�ina
+- `latitude` (query, obavezno): Geografska širina
+- `longitude` (query, obavezno): Geografska dužina
 - `radiusKm` (query, opcionalno): Radijus pretrage u kilometrima. Default: 5.0
 
 **Primjer:**
@@ -272,10 +272,10 @@ GET /api/prices/ByCodesNearby?codes=123&codes=456&latitude=45.815&longitude=15.9
 
 ### GET /api/prices/SearchProducts
 
-Pretra�ivanje proizvoda po nazivu ili marki.
+Pretraživanje proizvoda po nazivu ili marki.
 
 **Parametri:**
-- `q` (query, obavezno): Pretra�ivani pojam
+- `q` (query, obavezno): Pretraživani pojam
 - `datum` (query, opcionalno): Datum za statistike cijena. Default: danas
 - `chains` (query, opcionalno): Lista lanaca za filtriranje
 
@@ -332,7 +332,7 @@ Statistike cijena po lancima i datumima.
 
 ---
 
-## ?? Response formati
+## ⚠️ Response formati
 
 ### Standardni error odgovori
 
@@ -346,28 +346,28 @@ Statistike cijena po lancima i datumima.
 **401 Unauthorized:**
 ```json
 {
-  "error": "API klju? nije valjan ili nedostaje."
+  "error": "API ključ nije valjan ili nedostaje."
 }
 ```
 
 **404 Not Found:**
 ```json
 {
-  "error": "Resurs nije prona?en."
+  "error": "Resurs nije pronađen."
 }
 ```
 
 **409 Conflict:**
 ```json
 {
-  "error": "Scraping posao ve? je pokrenut."
+  "error": "Scraping posao već je pokrenut."
 }
 ```
 
 **500 Internal Server Error:**
 ```json
 {
-  "error": "Do�lo je do gre�ke na serveru."
+  "error": "Došlo je do greške na serveru."
 }
 ```
 
@@ -379,14 +379,14 @@ Svi datumi koriste format `YYYY-MM-DD` (ISO 8601):
 
 ### Decimal format
 
-Sve cijene su u decimalnom formatu s to?kom kao separatorom:
+Sve cijene su u decimalnom formatu s točkom kao separatorom:
 - `1.89`
 - `125.50`
 - `0.99`
 
 ---
 
-## ?? Swagger UI
+## 📜 Swagger UI
 
 Za interaktivno testiranje svih endpointova, posjetite:
 
@@ -394,7 +394,7 @@ Za interaktivno testiranje svih endpointova, posjetite:
 http://localhost:8080/swagger
 ```
 
-Swagger UI omogu?uje:
+Swagger UI omogućuje:
 - Pregled svih dostupnih endpointova
 - Testiranje API poziva direktno iz browsera
 - Automatska generacija zahtjeva
@@ -402,7 +402,7 @@ Swagger UI omogu?uje:
 
 ---
 
-## ?? Primjeri integracije
+## 🧩 Primjeri integracije
 
 ### cURL primjeri
 
@@ -410,17 +410,17 @@ Swagger UI omogu?uje:
 # Health check
 curl http://localhost:8080/health
 
-# Pokretanje scraping-a s API klju?em
+# Pokretanje scraping-a s API ključem
 curl -X POST \
-  -H "X-API-Key: va�-api-klju?" \
+  -H "X-API-Key: vaš-api-ključ" \
   "http://localhost:8080/api/scraper/start/konzum?date=2025-01-15"
 
-# Dohva?anje cijena
-curl -H "X-API-Key: va�-api-klju?" \
+# Dohvaćanje cijena
+curl -H "X-API-Key: vaš-api-ključ" \
   "http://localhost:8080/api/prices?dates=2025-01-15&take=10&chain=konzum"
 
-# Pretra�ivanje najjeftinijih lokacija
-curl -H "X-API-Key: va�-api-klju?" \
+# Pretraživanje najjeftinijih lokacija
+curl -H "X-API-Key: vaš-api-ključ" \
   "http://localhost:8080/api/prices/CheapestLocation?barcode=1234567890123"
 ```
 
@@ -428,7 +428,7 @@ curl -H "X-API-Key: va�-api-klju?" \
 
 ```javascript
 const API_BASE = 'http://localhost:8080';
-const API_KEY = 'va�-api-klju?';
+const API_KEY = 'vaš-api-ključ';
 
 const headers = {
   'X-API-Key': API_KEY,
@@ -444,7 +444,7 @@ async function startScraping(chain, date) {
   return response.text();
 }
 
-// Dohva?anje cijena
+// Dohvaćanje cijena
 async function getPrices(dates, chain = null, take = 100) {
   const params = new URLSearchParams();
   dates.forEach(date => params.append('dates', date));
@@ -455,7 +455,7 @@ async function getPrices(dates, chain = null, take = 100) {
   return response.json();
 }
 
-// Pretra�ivanje proizvoda
+// Pretraživanje proizvoda
 async function searchProducts(query, chains = []) {
   const params = new URLSearchParams();
   params.append('q', query);
@@ -473,7 +473,7 @@ import requests
 from datetime import date
 
 API_BASE = 'http://localhost:8080'
-API_KEY = 'va�-api-klju?'
+API_KEY = 'vaš-api-ključ'
 
 headers = {
     'X-API-Key': API_KEY,
@@ -492,7 +492,7 @@ def start_scraping(chain, scrape_date=None):
     )
     return response.text
 
-# Dohva?anje cijena
+# Dohvaćanje cijena
 def get_prices(dates, chain=None, take=100):
     params = {'dates': dates, 'take': take}
     if chain:
@@ -513,18 +513,18 @@ def get_cheapest_location(barcode, scrape_date=None):
 
 ---
 
-## ?? Performance savjeti
+## 🚀 Performance savjeti
 
 ### Optimizacija zahtjeva
 
 1. **Koristite paginaciju**: Postavite razuman `take` parametar
-2. **Filtrirajte po datumu**: Specificirajte to?ne datume umjesto �irokih raspona
+2. **Filtrirajte po datumu**: Specificirajte točne datume umjesto širokih raspona
 3. **Cache rezultate**: API ne implementira vlastiti cache, dodajte ga na klijentskoj strani
-4. **Batch zahtjevi**: Koristite endpointove koji vra?aju vi�e podataka odjednom
+4. **Batch zahtjevi**: Koristite endpointove koji vraćaju više podataka odjednom
 
 ### Rate limiting
 
-Trenutno nema implementiran rate limiting, ali preporu?uje se:
+Trenutno nema implementiran rate limiting, ali preporučuje se:
 - Maksimalno 100 zahtjeva po minuti
 - Maksimalno 1000 rezultata po zahtjevu
 - Izbjegavanje simultanih scraping zahtjeva
