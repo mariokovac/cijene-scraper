@@ -39,7 +39,7 @@ Pokretanje scraping posla za određeni lanac.
 
 **Parametri:**
 - `chain` (path, obavezno): Naziv lanca
-  - Podržani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `lidl`, `*` (svi lanci)
+  - Podržani lanci: `konzum`, `kaufland`, `plodine`, `spar`, `lidl`, `studenac`, `*` (svi lanci)
 - `date` (query, opcionalno): Datum u formatu `YYYY-MM-DD`. Default: danas
 - `force` (query, opcionalno): Prisilno pokretanje (prekida postojeći posao). Default: `false`
 

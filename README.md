@@ -7,7 +7,7 @@ ASP.NET Core Web API projekt za scraping i pohranu cijena proizvoda iz maloproda
 ### Osnovna funkcionalnost
 - **RESTful Web API** za upravljanje scraping zadacima
 - **Automatski scraping cijena** iz službenih izvora
-- **Parsiranje i normalizacija podataka** o proizvodima i cijenama
+- **Parsanje i normalizacija podataka** o proizvodima i cijenama
 - **Pohrana podataka** u PostgreSQL bazu (Entity Framework Core)
 - **Dvostruko keširanje** - CSV i Parquet format za različite potrebe
 
@@ -18,6 +18,7 @@ Trenutno podržava sljedeće lance:
 - **Plodine** - CSV datoteke s cjenikom
 - **Spar** - CSV datoteke s cjenikom
 - **Lidl** - ZIP datoteke s CSV cjenicima
+- **Studenac** - ZIP datoteke s XML cjenicima
 
 ### Napredne funkcionalnosti
 - **Geolokacija trgovina** - Google Geocoding API integracija
@@ -175,8 +176,9 @@ Za automatsko geocodiranje adresa trgovina:
 
 ## 🔧 Dodavanje novog lanca
 
-1. **Stvori novu CSV record klasu**:
+1. **Stvori novu XML/CSV record klasu**:
 ```csharp
+// Za CSV format (kao što koriste drugi lanci)
 public class NoviLanacCsvRecord : CsvRecordBase
 {
     [Name("Naziv")]
@@ -192,17 +194,39 @@ public class NoviLanacCsvRecord : CsvRecordBase
         // implementiraj konverziju
     }
 }
+
+// Za XML format (kao što koristi Studenac)
+[XmlRoot("RootElement")]
+public class NoviLanacXmlRecord
+{
+    [XmlElement("NazivProizvoda")]
+    public string Product { get; set; }
+    
+    [XmlElement("Cijena")]
+    public string Price { get; set; }
+    
+    // implementiraj ostala svojstva
+    
+    public PriceInfo ToPriceInfo()
+    {
+        // implementiraj konverziju
+    }
+}
 ```
 
 2. **Stvori crawler**:
 ```csharp
-public class NoviLanacCrawler : ICrawler
+public class NoviLanacCrawler : CrawlerBase
 {
-    public string ChainName => "novilanac";
+    public override string Chain => "novilanac";
     
-    public async Task<IEnumerable<PriceInfo>> ScrapeAsync(DateOnly date, CancellationToken cancellationToken)
+    public override async Task<Dictionary<StoreInfo, List<PriceInfo>>> Crawl(
+        DateOnly date, CancellationToken cancellationToken)
     {
         // implementiraj scraping logiku
+        // - Za CSV: koristi getUniqueRecordsFromCsv<T>()
+        // - Za XML: koristi XmlSerializer za parsiranje
+        // - Za ZIP: koristi ZipArchive za izvlačenje datoteka
     }
 }
 ```
@@ -211,6 +235,37 @@ public class NoviLanacCrawler : ICrawler
 ```csharp
 builder.Services.AddTransient<ICrawler, NoviLanacCrawler>();
 ```
+
+### Primjer implementacije (Studenac pattern)
+
+Studenac koristi ZIP datoteke s XML podacima po trgovinama. Implementacija uključuje:
+
+**XML struktura:**
+```xml
+<Proizvodi>
+  <ProdajniObjekt>
+    <Oblik>SUPERMARKET</Oblik>
+    <Oznaka>1351</Oznaka>
+    <Adresa>Obrtnička ulica 2 PREGRADA</Adresa>
+    <Proizvodi>
+      <Proizvod>
+        <NazivProizvoda>Proizvod naziv</NazivProizvoda>
+        <SifraProizvoda>123456</SifraProizvoda>
+        <MaloprodajnaCijena>1.99</MaloprodajnaCijena>
+        <Barkod>1234567890123</Barkod>
+        <!-- ostala polja -->
+      </Proizvod>
+    </Proizvodi>
+  </ProdajniObjekt>
+</Proizvodi>
+```
+
+**Ključne značajke:**
+- ZIP datoteke s datumom u nazivu: `PROIZVODI-2025-07-22.zip`
+- XML datoteke po trgovinama unutar ZIP-a
+- Podaci o trgovini izvlače se iz XML-a (ne iz naziva datoteke)
+- Decimal separator: točka (.)
+- Encoding: UTF-8
 
 ## 🗄️ Baza podataka
 

@@ -11,6 +11,7 @@ using CijeneScraper.Services.Crawlers.Chains.Konzum;
 using CijeneScraper.Services.Crawlers.Chains.Lidl;
 using CijeneScraper.Services.Crawlers.Chains.Plodine;
 using CijeneScraper.Services.Crawlers.Chains.Spar;
+using CijeneScraper.Services.Crawlers.Chains.Studenac;
 using CijeneScraper.Services.DataProcessor;
 using CijeneScraper.Services.Geocoding;
 using CijeneScraper.Services.Logging;
@@ -89,6 +90,7 @@ namespace CijeneScraper
             builder.Services.AddTransient<ICrawler, PlodineCrawler>();
             builder.Services.AddTransient<ICrawler, SparCrawler>();
             builder.Services.AddTransient<ICrawler, LidlCrawler>();
+            builder.Services.AddTransient<ICrawler, StudenacCrawler>();
             // TODO
             //builder.Services.AddTransient<ICrawler, IntersparCrawler>();
             //...
