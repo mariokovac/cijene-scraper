@@ -154,6 +154,10 @@ namespace CijeneScraper.Controllers
                 })
                 .ToListAsync();
 
+            // Return empty list if no prices found
+            if (!prices.Any())
+                return Ok(new List<CheapestStoreInfo>());
+
             // Find the lowest price
             var lowestPrice = prices.First().Price;
 

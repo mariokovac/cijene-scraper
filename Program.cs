@@ -66,6 +66,7 @@ namespace CijeneScraper
             builder.Services.AddHttpClient("GoogleGeocoding", client =>
             {
                 client.BaseAddress = new Uri("https://maps.googleapis.com/");
+                client.Timeout = TimeSpan.FromSeconds(30);
             });
 
             // Register application services and dependencies
@@ -77,7 +78,7 @@ namespace CijeneScraper
 
             builder.Services.AddSingleton<ScrapingQueue>();
             builder.Services.AddHostedService<ScrapingWorker>();
-            builder.Services.AddSingleton<HttpClient>();
+            builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
 
             if(cachingEngine == "csv")
                 builder.Services.AddSingleton<ICacheProvider, CsvCacheProvider>();
@@ -106,8 +107,10 @@ namespace CijeneScraper
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
+                    var allowedOrigins = builder.Configuration["AllowedOrigins"]?.Split(",")
+                        ?? new[] { "https://localhost:3000" };
                     policy
-                        .AllowAnyOrigin()
+                        .WithOrigins(allowedOrigins)
                         .AllowAnyMethod()
                         .AllowAnyHeader();
                 });

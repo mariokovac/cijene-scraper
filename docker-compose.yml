@@ -24,7 +24,7 @@ services:
     env_file:
       - .env
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=${ConnectionStrings__DefaultConnection}
     volumes:
       - ./ScrapedData:/app/ScrapedData

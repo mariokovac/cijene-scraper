@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Encodings.Web;
 
 namespace CijeneScraper.Services.Security
@@ -46,9 +48,11 @@ namespace CijeneScraper.Services.Security
                 return Task.FromResult(AuthenticateResult.Fail("API Key is not configured"));
             }
 
-            // Check if the provided API key matches the expected one
-            var providedApiKey = apiKeyHeaderValues.FirstOrDefault();
-            if (!string.Equals(expectedApiKey, providedApiKey))
+            // Check if the provided API key matches the expected one (timing-safe comparison)
+            var providedApiKey = apiKeyHeaderValues.FirstOrDefault() ?? string.Empty;
+            var expectedBytes = Encoding.UTF8.GetBytes(expectedApiKey);
+            var providedBytes = Encoding.UTF8.GetBytes(providedApiKey);
+            if (!CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes))
             {
                 return Task.FromResult(AuthenticateResult.Fail("Invalid API Key"));
             }
