@@ -106,8 +106,10 @@ namespace CijeneScraper
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
+                    var allowedOrigins = builder.Configuration["AllowedOrigins"]?.Split(",")
+                        ?? new[] { "https://localhost:3000" };
                     policy
-                        .AllowAnyOrigin()
+                        .WithOrigins(allowedOrigins)
                         .AllowAnyMethod()
                         .AllowAnyHeader();
                 });
