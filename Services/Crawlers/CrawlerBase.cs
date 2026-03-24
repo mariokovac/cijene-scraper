@@ -161,15 +161,22 @@ namespace CijeneScraper.Crawler
 
             while (await csv.ReadAsync())
             {
-                var record = csv.GetRecord<T>();
-                var key = keySelector(record);
+                try
+                {
+                    var record = csv.GetRecord<T>();
+                    var key = keySelector(record);
 
-                // Skip records without a key
-                if (string.IsNullOrEmpty(key))
-                    continue;
+                    // Skip records without a key
+                    if (string.IsNullOrEmpty(key))
+                        continue;
 
-                // Dictionary automatically ensures uniqueness - the last record "wins"
-                uniqueRecords[key] = record;
+                    // Dictionary automatically ensures uniqueness - the last record "wins"
+                    uniqueRecords[key] = record;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Skipped CSV row: {Reason}", ex.Message);
+                }
             }
 
             return uniqueRecords.Values.ToList();
