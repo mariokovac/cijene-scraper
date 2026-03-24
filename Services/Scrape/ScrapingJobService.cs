@@ -58,6 +58,8 @@ namespace CijeneScraper.Services.Scrape
 
             int totalChanges = 0;
             var jobLogs = new List<ScrapingJobLog>();
+            var failedChains = new List<string>();
+            var succeededChains = new List<string>();
 
             foreach (var c in crawlers)
             {
@@ -223,7 +225,16 @@ namespace CijeneScraper.Services.Scrape
                 {
                     _logger.LogInformation("Scraping job for chain {Chain} was cancelled (JobLogId: {JobLogId})", c.Chain, jobLog.Id);
                     await _jobLogService.CancelJobAsync(jobLog.Id, "Operation was cancelled by user or system", cancellationToken);
-                    throw;
+                    
+                    // If processing a single chain, re-throw to cancel the entire operation
+                    // If processing multiple chains (*), only cancel this specific chain
+                    if (chain != "*")
+                    {
+                        throw;
+                    }
+                    
+                    failedChains.Add(c.Chain);
+                    continue;
                 }
                 catch (Exception ex)
                 {
@@ -248,18 +259,54 @@ namespace CijeneScraper.Services.Scrape
                     {
                         _logger.LogError(smtpEx, "Failed to send email notification for scraping failure of {Chain}", c.Chain);
                     }
-                    throw;
+                    
+                    // If processing a single chain, re-throw to propagate the error
+                    // If processing multiple chains (*), continue with the next chain
+                    if (chain != "*")
+                    {
+                        throw;
+                    }
+                    
+                    failedChains.Add(c.Chain);
+                    continue;
                 }
+
+                // Track successful chains
+                succeededChains.Add(c.Chain);
             }
 
-            var message = chain == "*" 
-                ? $"Scraping jobs for all chains completed for date {date:yyyy-MM-dd}. Total changes: {totalChanges}. Job log IDs: {string.Join(", ", jobLogs.Select(j => j.Id))}"
-                : $"Scraping job for chain '{chain}' completed for date {date:yyyy-MM-dd}. Total changes: {totalChanges}. Job log ID: {jobLogs.FirstOrDefault()?.Id}";
+            // Build result message
+            string message;
+            bool success = true;
+
+            if (chain == "*")
+            {
+                var successPart = succeededChains.Count > 0 
+                    ? $"Succeeded: {string.Join(", ", succeededChains)} ({totalChanges} total changes)."
+                    : "No chains succeeded.";
+                
+                var failedPart = failedChains.Count > 0 
+                    ? $" Failed: {string.Join(", ", failedChains)}."
+                    : "";
+
+                message = $"Scraping jobs for all chains completed for date {date:yyyy-MM-dd}. {successPart}{failedPart} Job log IDs: {string.Join(", ", jobLogs.Select(j => j.Id))}";
+                
+                // Consider it a partial failure if any chains failed
+                if (failedChains.Count > 0)
+                {
+                    success = succeededChains.Count > 0; // Success if at least one chain succeeded
+                }
+            }
+            else
+            {
+                message = $"Scraping job for chain '{chain}' completed for date {date:yyyy-MM-dd}. Total changes: {totalChanges}. Job log ID: {jobLogs.FirstOrDefault()?.Id}";
+            }
 
             return new ScrapingJobResult
             {
-                Success = true,
-                Message = message
+                Success = success,
+                Message = message,
+                ErrorMessage = failedChains.Count > 0 ? $"Failed chains: {string.Join(", ", failedChains)}" : null
             };
         }
     }
