@@ -3,6 +3,7 @@ using CijeneScraper.Services;
 using CijeneScraper.Services.Scrape;
 using CijeneScraper.Services.Logging;
 using CijeneScraper.Models.Database;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,7 @@ namespace CijeneScraper.Controllers
     /// processes the scraped data, and manages notifications for job completion or failure.
     /// </summary>
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class ScraperController : ControllerBase
     {
