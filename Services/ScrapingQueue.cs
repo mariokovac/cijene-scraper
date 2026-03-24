@@ -13,11 +13,17 @@ namespace CijeneScraper.Services
         private readonly object _lock = new();
         private Task? _currentTask;
         private CancellationTokenSource? _cts;
+        private readonly ILogger<ScrapingQueue> _logger;
 
         /// <summary>
         /// Internal concurrent queue holding scraping tasks.
         /// </summary>
         private readonly ConcurrentQueue<Func<CancellationToken, Task>> _tasks = new();
+
+        public ScrapingQueue(ILogger<ScrapingQueue> logger)
+        {
+            _logger = logger;
+        }
 
         /// <summary>
         /// Indicates whether a scraping task is currently running.
@@ -56,7 +62,17 @@ namespace CijeneScraper.Services
                 // Start processing if not already running
                 if (!IsRunning)
                 {
-                    _ = Task.Run(ProcessQueueAsync);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await ProcessQueueAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogCritical(ex, "ScrapingQueue crashed");
+                        }
+                    });
                 }
             }
         }
@@ -104,10 +120,9 @@ namespace CijeneScraper.Services
                 {
                     // Task was cancelled, continue to next task
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Log exception if needed, but continue processing
-                    throw;
+                    _logger.LogError(ex, "Scraping task failed, continuing queue processing");
                 }
             }
 
